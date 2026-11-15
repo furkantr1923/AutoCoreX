@@ -1,0 +1,42 @@
+<div class="dtc ciddiyet-@Bilgi.Ciddiyet @(acik ? "acik" : "")" style="--i:@Sira">
+    <button class="dtc-ust" @onclick="() => acik = !acik">
+        <span class="dtc-kod">@Bilgi.Kod</span>
+        <span class="dtc-ozet">
+            <b>@Bilgi.Aciklama</b>
+            <small>@Bilgi.Sistem</small>
+        </span>
+        <span class="dtc-seviye">@Bilgi.CiddiyetAdi</span>
+    </button>
+    @if (acik)
+    {
+        <div class="dtc-detay">
+            <h4>Olası nedenler</h4>
+            <ul>
+                @foreach (var n in Bilgi.Nedenler)
+                {
+                    <li>@n</li>
+                }
+            </ul>
+            <h4>Kontrol edilmesi gerekenler</h4>
+            <ul>
+                @foreach (var k in Bilgi.Kontroller)
+                {
+                    <li>@k</li>
+                }
+            </ul>
+            <div class="dtc-oneri"><Ikon Ad="bilgi" Boyut="16" /> @Bilgi.ServisOnerisi</div>
+            @if (!Bilgi.Sozlukte)
+            {
+                <small class="soluk">Bu kodun ayrıntısı uygulama sözlüğünde yok; yukarıdaki bilgi koddan çıkarılan genel sınıflandırmadır.</small>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public DtcBilgi Bilgi { get; set; } = new();
+    [Parameter] public bool Acik { get; set; }
+    [Parameter] public int Sira { get; set; }
+    private bool acik;
+    protected override void OnInitialized() => acik = Acik;
+}

@@ -1,0 +1,203 @@
+@page "/"
+@inject ObdServisi Obd
+@inject Veri Veri
+@inject Efekt Efekt
+@implements IDisposable
+
+<SayfaBaslik Ust="@(arac?.TamAd.ToUpperInvariant() ?? "ARAÇ SEÇİLMEDİ")" Baslik="Kokpit" />
+
+@if (yuklendi && arac == null)
+{
+    <div class="panel karsilama giris-anim">
+        <div class="kar-ikon"><Ikon Ad="arac" Boyut="44" Kalinlik="1.4" /></div>
+        <h2>Garajın boş</h2>
+        <p class="soluk">Bakım, yakıt ve teşhis kayıtları araca bağlı tutulur. Başlamak için aracını ekle.</p>
+        <a class="btn btn-ana" href="arac/yeni"><Ikon Ad="arti" Boyut="18" /> Araç ekle</a>
+    </div>
+}
+
+@if (Obd.Demo)
+{
+    <div class="demo-serit"><Ikon Ad="uyari" Boyut="16" /> DEMO · Simülasyon verisi, gerçek araç verisi değildir</div>
+}
+
+<section class="kokpit giris-anim" style="--i:0">
+    <div class="vites-isiklari @(rpm >= 4500 ? "flas" : "")">
+        @for (var i = 0; i < 10; i++)
+        {
+            <i class="@LedSinif(i)"></i>
+        }
+    </div>
+    <Gosterge Deger="@rpm" Min="0" Max="6000" KirmiziBaslangic="4500" Boyut="300" AnaBolum="6" EtiketBolen="1000" Etiket="RPM × 1000">
+        <b class="hiz-deger">@(hiz.HasValue ? hiz.Value.ToString("0") : "—")</b>
+        <small class="hiz-birim">km/s</small>
+        <span class="rpm-mini">@(rpm.HasValue ? rpm.Value.ToString("N0") + " rpm" : "VERİ YOK")</span>
+    </Gosterge>
+    <div class="kokpit-yan sol">
+        <Gosterge Deger="@Obd.Deger("05")" Min="40" Max="130" KirmiziBaslangic="105" Boyut="112" AnaBolum="3" Birim="°C" Etiket="MOTOR" />
+    </div>
+    <div class="kokpit-yan sag">
+        <Gosterge Deger="@Obd.Voltaj()" Min="10" Max="16" Boyut="112" AnaBolum="3" Ondalik="1" Birim="V" Etiket="AKÜ / ECU" />
+    </div>
+</section>
+
+<section class="izgara-3 giris-anim" style="--i:1">
+    @foreach (var k in Kutular)
+    {
+        var deger = k.Pid == "42" ? Obd.Voltaj() : Obd.Deger(k.Pid);
+        var destek = !Obd.Canli || k.Pid == "42" || Obd.Destekli(k.Pid);
+        var oran = deger.HasValue ? Math.Clamp((deger.Value - k.Min) / (k.Max - k.Min), 0, 1) : 0;
+        <div class="sensor @(deger.HasValue && k.Uyari(deger.Value) ? "uyari" : "") @(!destek ? "desteksiz" : "")">
+            <div class="s-ust"><Ikon Ad="@k.Ikon" Boyut="15" /><span>@k.Ad</span></div>
+            <div class="s-deger">
+                @if (!destek)
+                {
+                    <em>DESTEKLENMİYOR</em>
+                }
+                else if (deger.HasValue)
+                {
+                    <b>@deger.Value.ToString("N" + k.Ondalik)</b><small>@k.Birim</small>
+                }
+                else
+                {
+                    <em>VERİ YOK</em>
+                }
+            </div>
+            <div class="s-bar"><i style="width:@(S.N(oran * 100))%"></i></div>
+        </div>
+    }
+</section>
+
+<section class="eylem-satiri giris-anim" style="--i:2">
+    @switch (Obd.Durum)
+    {
+        case ObdDurum.Demo:
+            <button class="btn btn-hayalet" @onclick="DemoDurdur"><Ikon Ad="dur" Boyut="16" /> Demoyu durdur</button>
+            <a class="btn btn-ana" href="obd"><Ikon Ad="bluetooth" Boyut="16" /> Gerçek adaptör</a>
+            break;
+        case ObdDurum.Bagli:
+            <div class="canli-bilgi"><i class="nabiz"></i>@Obd.CihazAdi · @Obd.SonGuncelleme.ToString("HH:mm:ss")</div>
+            <a class="btn btn-hayalet" href="obd">Bağlantı</a>
+            break;
+        case ObdDurum.Baglaniyor:
+            <div class="canli-bilgi"><i class="nabiz"></i>Bağlanıyor…</div>
+            break;
+        default:
+            <button class="btn btn-hayalet" @onclick="DemoBaslat"><Ikon Ad="oynat" Boyut="16" /> Demo modu</button>
+            <a class="btn btn-ana" href="obd"><Ikon Ad="bluetooth" Boyut="16" /> OBD bağlan</a>
+            break;
+    }
+</section>
+
+@if (arac != null)
+{
+    <section class="izgara-2 giris-anim" style="--i:3">
+        <a class="panel saglik dokun" href="rapor">
+            <div class="panel-baslik"><span>SAĞLIK SKORU</span><Ikon Ad="kalkan" Boyut="16" /></div>
+            <div class="halka-kap">
+                <svg viewBox="0 0 120 120" class="halka @SaglikSinif">
+                    <circle cx="60" cy="60" r="50" class="h-zemin" pathLength="100" />
+                    <circle cx="60" cy="60" r="50" class="h-dolu" pathLength="100" style="stroke-dashoffset:@(S.N(100 - (saglik.Skor ?? 0)))" />
+                </svg>
+                <div class="halka-yazi"><b>@(saglik.Skor?.ToString() ?? "—")</b><small>@saglik.Seviye</small></div>
+            </div>
+        </a>
+        <a class="panel dokun yaklasan" href="bakim">
+            <div class="panel-baslik"><span>SERVİS</span><Ikon Ad="bakim" Boyut="16" /></div>
+            @if (dikkat.Count == 0)
+            {
+                <div class="ok-durum"><Ikon Ad="tamam" Boyut="26" /><small>@(durumlar.Count == 0 ? "Bakım kaydı yok" : "Yaklaşan bakım yok")</small></div>
+            }
+            else
+            {
+                <ul class="mini-liste">
+                    @foreach (var d in dikkat.Take(3))
+                    {
+                        <li class="@(d.Durum == BakimDurumu.Gecikti ? "kirmizi" : "sari")"><b>@d.Tur</b><small>@d.Metin</small></li>
+                    }
+                </ul>
+            }
+        </a>
+    </section>
+
+    <section class="izgara-3 giris-anim" style="--i:4">
+        <a class="ozet-kart dokun" href="garaj"><small>KİLOMETRE</small><b>@arac.Km.ToString("N0")</b><span>km</span></a>
+        <a class="ozet-kart dokun" href="yakit"><small>ORT. TÜKETİM</small><b>@(yakit.OrtTuketim?.ToString("0.0") ?? "—")</b><span>L/100 km</span></a>
+        <a class="ozet-kart dokun" href="yakit"><small>BU AY YAKIT</small><b>@yakit.BuAy.ToString("N0")</b><span>₺</span></a>
+    </section>
+}
+
+@code {
+    private Arac? arac;
+    private bool yuklendi;
+    private List<BakimDurumSatiri> durumlar = new();
+    private List<BakimDurumSatiri> dikkat = new();
+    private SaglikSonucu saglik = new();
+    private YakitOzeti yakit = new();
+    private TaramaKaydi? sonTarama;
+    private DateTime sonCizim;
+
+    private double? rpm => Obd.Deger("0C");
+    private double? hiz => Obd.Deger("0D");
+
+    private record Kutu(string Pid, string Ad, string Ikon, string Birim, double Min, double Max, int Ondalik, Func<double, bool> Uyari);
+
+    private static readonly Kutu[] Kutular =
+    {
+        new("04", "YÜK", "motor", "%", 0, 100, 0, v => v > 90),
+        new("11", "GAZ", "grafik", "%", 0, 100, 0, _ => false),
+        new("0F", "EMME", "isi", "°C", -10, 70, 0, v => v > 60),
+        new("0B", "MAP", "simsek", "kPa", 80, 250, 0, _ => false),
+        new("05", "SOĞUTMA", "isi", "°C", 40, 130, 0, v => v > 105),
+        new("42", "ECU V", "aku", "V", 10, 16, 1, v => v < 11.8),
+    };
+
+    private string LedSinif(int i)
+    {
+        var yanik = rpm >= 1000 + i * 400;
+        var renk = i < 5 ? "yesil" : i < 8 ? "sari" : "kirmizi";
+        return yanik ? $"{renk} yanik" : renk;
+    }
+
+    private string SaglikSinif => saglik.Skor switch { null => "gri", >= 85 => "iyi", >= 65 => "orta", _ => "kotu" };
+
+    protected override async Task OnInitializedAsync()
+    {
+        Obd.Degisti += ObdDegisti;
+        Veri.Degisti += VeriDegisti;
+        await Yukle();
+    }
+
+    private async Task Yukle()
+    {
+        arac = await Veri.AktifAracAsync();
+        if (arac != null)
+        {
+            durumlar = Hesap.BakimDurumlari(await Veri.BakimlarAsync(arac.Id), arac);
+            dikkat = durumlar.Where(d => d.Durum is BakimDurumu.Gecikti or BakimDurumu.Yaklasiyor).ToList();
+            sonTarama = (await Veri.TaramalarAsync(arac.Id)).FirstOrDefault();
+            yakit = Hesap.YakitOzeti(await Veri.YakitlarAsync(arac.Id));
+        }
+        saglik = Hesap.Saglik(durumlar, sonTarama, Obd);
+        yuklendi = true;
+    }
+
+    private void ObdDegisti()
+    {
+        // ~8 kare/sn ile sınırla
+        if ((DateTime.Now - sonCizim).TotalMilliseconds < 120) return;
+        sonCizim = DateTime.Now;
+        InvokeAsync(() => { saglik = Hesap.Saglik(durumlar, sonTarama, Obd); StateHasChanged(); });
+    }
+
+    private void VeriDegisti() => InvokeAsync(async () => { await Yukle(); StateHasChanged(); });
+
+    private async Task DemoBaslat() { await Obd.DemoBaslatAsync(); await Efekt.Ses("baslat", 50); }
+    private async Task DemoDurdur() { await Obd.DurdurAsync(); await Efekt.Ses("kopma", 30); }
+
+    public void Dispose()
+    {
+        Obd.Degisti -= ObdDegisti;
+        Veri.Degisti -= VeriDegisti;
+    }
+}

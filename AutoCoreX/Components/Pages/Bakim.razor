@@ -1,0 +1,106 @@
+@page "/bakim"
+@inject Veri Veri
+
+<SayfaBaslik Ust="@(arac?.TamAd.ToUpperInvariant() ?? "SERVİS")" Baslik="Bakım">
+    @if (arac != null)
+    {
+        <a class="btn btn-ana btn-ikon" href="bakim/yeni" aria-label="Bakım ekle"><Ikon Ad="arti" Boyut="20" /></a>
+    }
+</SayfaBaslik>
+<ServisSekme />
+
+@if (yuklendi && arac == null)
+{
+    <AracYok Metin="Bakım geçmişi ve hatırlatmalar aktif araca göre tutulur." />
+}
+else if (arac != null)
+{
+    <section class="izgara-3 giris-anim">
+        <div class="ozet-kart"><small>BU YIL</small><b>@buYil.ToString("N0")</b><span>₺ bakım</span></div>
+        <div class="ozet-kart"><small>TOPLAM</small><b>@toplam.ToString("N0")</b><span>₺</span></div>
+        <div class="ozet-kart @(gecikenSayi > 0 ? "kirmizi" : "")"><small>GECİKEN</small><b>@gecikenSayi</b><span>işlem</span></div>
+    </section>
+
+    if (durumlar.Count > 0)
+    {
+        <section class="giris-anim" style="--i:1">
+            <div class="bolum-baslik"><span>BAKIM PLANI</span><small>@S.Km(arac.Km) güncel</small></div>
+            @foreach (var d in durumlar)
+            {
+                var tur = Hesap.Tur(d.Tur);
+                <a class="plan-satir durum-@d.Durum.ToString().ToLowerInvariant() dokun" href="bakim/@d.Son.Id">
+                    <div class="ps-ikon"><Ikon Ad="@tur.Ikon" Boyut="20" /></div>
+                    <div class="ps-orta">
+                        <b>@d.Tur</b>
+                        <small>@d.Metin</small>
+                        <div class="ps-bar"><i style="width:@(S.N(Ilerleme(d) * 100))%"></i></div>
+                    </div>
+                    <span class="ps-durum">@DurumAdi(d.Durum)</span>
+                </a>
+            }
+        </section>
+    }
+
+    <section class="giris-anim" style="--i:2">
+        <div class="bolum-baslik"><span>GEÇMİŞ</span><small>@kayitlar.Count kayıt</small></div>
+        @if (kayitlar.Count == 0)
+        {
+            <div class="bos">
+                <Ikon Ad="bakim" Boyut="36" Kalinlik="1.3" />
+                <b>Bakım kaydı yok</b>
+                <small>İlk kaydı ekleyince yaklaşan bakımlar otomatik hesaplanır.</small>
+                <a class="btn btn-ana" href="bakim/yeni"><Ikon Ad="arti" Boyut="16" /> Bakım ekle</a>
+            </div>
+        }
+        <div class="zaman-cizelgesi">
+            @foreach (var b in kayitlar)
+            {
+                <a class="zc-oge dokun" href="bakim/@b.Id">
+                    <i class="zc-nokta"></i>
+                    <div class="zc-ust"><b>@b.Tur</b><span>@S.Para(b.Maliyet)</span></div>
+                    <small>@b.Tarih.ToString("dd MMM yyyy") · @S.Km(b.Km)@(string.IsNullOrWhiteSpace(b.Servis) ? "" : " · " + b.Servis)</small>
+                    @if (!string.IsNullOrWhiteSpace(b.Aciklama)) { <p>@b.Aciklama</p> }
+                </a>
+            }
+        </div>
+    </section>
+}
+
+@code {
+    private Arac? arac;
+    private bool yuklendi;
+    private List<BakimKaydi> kayitlar = new();
+    private List<BakimDurumSatiri> durumlar = new();
+    private double buYil, toplam;
+    private int gecikenSayi;
+
+    protected override async Task OnInitializedAsync()
+    {
+        arac = await Veri.AktifAracAsync();
+        if (arac != null)
+        {
+            kayitlar = await Veri.BakimlarAsync(arac.Id);
+            durumlar = Hesap.BakimDurumlari(kayitlar, arac);
+            buYil = kayitlar.Where(k => k.Tarih.Year == DateTime.Today.Year).Sum(k => k.Maliyet);
+            toplam = kayitlar.Sum(k => k.Maliyet);
+            gecikenSayi = durumlar.Count(d => d.Durum == BakimDurumu.Gecikti);
+        }
+        yuklendi = true;
+    }
+
+    private static string DurumAdi(BakimDurumu d) => d switch
+    {
+        BakimDurumu.Gecikti => "GECİKTİ", BakimDurumu.Yaklasiyor => "YAKLAŞIYOR", BakimDurumu.Iyi => "İYİ", _ => "PLANSIZ"
+    };
+
+    // Son bakımdan sonraki bakıma ne kadar yol alındı (0..1)
+    private double Ilerleme(BakimDurumSatiri d)
+    {
+        var o = new List<double>();
+        if (d.Son.SonrakiKm.HasValue && arac != null && d.Son.SonrakiKm > d.Son.Km)
+            o.Add((double)(arac.Km - d.Son.Km) / (d.Son.SonrakiKm.Value - d.Son.Km));
+        if (d.Son.SonrakiTarih.HasValue && d.Son.SonrakiTarih > d.Son.Tarih)
+            o.Add((DateTime.Today - d.Son.Tarih).TotalDays / (d.Son.SonrakiTarih.Value - d.Son.Tarih).TotalDays);
+        return o.Count == 0 ? 0 : Math.Clamp(o.Max(), 0, 1);
+    }
+}

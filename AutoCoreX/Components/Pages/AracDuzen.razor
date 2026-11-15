@@ -1,0 +1,128 @@
+@page "/arac/yeni"
+@page "/arac/{Id:int}"
+@inject Veri Veri
+@inject Cihaz Cihaz
+@inject Efekt Efekt
+@inject NavigationManager Nav
+
+<SayfaBaslik Ust="ARAÇ PROFİLİ" Baslik="@(Id == null ? "Yeni araç" : "Aracı düzenle")" Geri="garaj" />
+
+<div class="foto-alan giris-anim dokun" @onclick="FotoSec">
+    <AracGorsel Yol="@a.FotoYolu" />
+    <span class="foto-ipucu"><Ikon Ad="foto" Boyut="16" /> @(a.FotoYolu == null ? "Fotoğraf ekle" : "Fotoğrafı değiştir")</span>
+</div>
+
+<div class="panel form giris-anim" style="--i:1">
+    <div class="izgara-2">
+        <label class="alan">Marka *<input class="girdi" @bind="a.Marka" placeholder="Peugeot" /></label>
+        <label class="alan">Model *<input class="girdi" @bind="a.Model" placeholder="2008 Allure" /></label>
+    </div>
+    <div class="izgara-2">
+        <label class="alan">Model yılı<input class="girdi" type="number" min="1980" max="2030" @bind="a.Yil" /></label>
+        <label class="alan">Motor<input class="girdi" @bind="a.MotorTipi" placeholder="1.6 HDi" /></label>
+    </div>
+    <div class="izgara-2">
+        <label class="alan">Yakıt tipi
+            <select class="girdi" @bind="a.YakitTipi">
+                @foreach (var y in YakitTipleri)
+                {
+                    <option value="@y">@y</option>
+                }
+            </select>
+        </label>
+        <label class="alan">Şanzıman
+            <select class="girdi" @bind="a.Sanziman">
+                @foreach (var s in Sanzimanlar)
+                {
+                    <option value="@s">@s</option>
+                }
+            </select>
+        </label>
+    </div>
+    <div class="izgara-2">
+        <label class="alan">Motor hacmi (cc)<input class="girdi" type="number" min="0" @bind="a.MotorHacmi" /></label>
+        <label class="alan">Kilometre<input class="girdi" type="number" min="0" @bind="a.Km" /></label>
+    </div>
+    <div class="izgara-2">
+        <label class="alan">Plaka (isteğe bağlı)<input class="girdi mono" @bind="a.Plaka" placeholder="34 ABC 123" autocapitalize="characters" /></label>
+        <label class="alan">Satın alma tarihi<input class="girdi" type="date" @bind="a.SatinAlma" /></label>
+    </div>
+    <label class="alan">Şasi numarası (isteğe bağlı)
+        <input class="girdi mono" @bind="sasi" maxlength="17" placeholder="17 karakter" autocapitalize="characters" />
+        <small class="soluk"><Ikon Ad="kilit" Boyut="12" /> Telefonun güvenli deposunda şifreli saklanır, raporlara eklenmez.</small>
+    </label>
+    <label class="alan">Notlar<textarea class="girdi" rows="3" @bind="a.Notlar"></textarea></label>
+</div>
+
+@if (hata != null) { <div class="not-kutu tehlike"><Ikon Ad="uyari" Boyut="18" /><span>@hata</span></div> }
+
+<button class="btn btn-ana btn-tam btn-buyuk" @onclick="Kaydet"><Ikon Ad="tamam" Boyut="18" /> Kaydet</button>
+
+@if (Id != null)
+{
+    if (!silOnay)
+    {
+        <button class="btn btn-tehlike-hayalet btn-tam" @onclick="() => silOnay = true"><Ikon Ad="sil" Boyut="16" /> Aracı sil</button>
+    }
+    else
+    {
+        <div class="not-kutu tehlike">
+            <span>Araç ve ona ait <b>tüm bakım, yakıt, yolculuk ve tarama kayıtları</b> silinecek.</span>
+        </div>
+        <div class="eylem-satiri">
+            <button class="btn btn-hayalet" @onclick="() => silOnay = false">Vazgeç</button>
+            <button class="btn btn-tehlike" @onclick="Sil">Evet, sil</button>
+        </div>
+    }
+}
+
+@code {
+    [Parameter] public int? Id { get; set; }
+    private Arac a = new();
+    private string? sasi;
+    private string? hata;
+    private bool silOnay;
+
+    private static readonly string[] YakitTipleri = { "Dizel", "Benzin", "LPG + Benzin", "Hibrit", "Elektrik" };
+    private static readonly string[] Sanzimanlar = { "Manuel", "Otomatik", "Yarı otomatik", "CVT" };
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (Id is int id)
+        {
+            a = await Veri.AracAsync(id) ?? new Arac();
+            sasi = await Veri.SasiAsync(id);
+        }
+    }
+
+    private async Task FotoSec()
+    {
+        var yol = await Cihaz.FotoSecAsync();
+        if (yol == null) return;
+        if (a.FotoYolu != null) Cihaz.DosyaSil(a.FotoYolu);
+        a.FotoYolu = yol;
+        await Efekt.Ses("onay");
+    }
+
+    private async Task Kaydet()
+    {
+        hata = null;
+        if (string.IsNullOrWhiteSpace(a.Marka) || string.IsNullOrWhiteSpace(a.Model)) { hata = "Marka ve model gerekli."; await Efekt.Ses("hata", 100); return; }
+        if (a.Km < 0) { hata = "Kilometre negatif olamaz."; return; }
+        if (!string.IsNullOrWhiteSpace(sasi) && sasi.Trim().Length != 17) { hata = "Şasi numarası 17 karakter olmalı."; await Efekt.Ses("hata", 100); return; }
+        a.Marka = a.Marka.Trim(); a.Model = a.Model.Trim();
+        a.Plaka = string.IsNullOrWhiteSpace(a.Plaka) ? null : a.Plaka.Trim().ToUpperInvariant();
+        a.SasiKayitli = !string.IsNullOrWhiteSpace(sasi);
+        await Veri.AracKaydetAsync(a);
+        await Veri.SasiKaydetAsync(a.Id, sasi);
+        await Efekt.Ses("kayit", 40);
+        Nav.NavigateTo("garaj");
+    }
+
+    private async Task Sil()
+    {
+        await Veri.AracSilAsync(a.Id);
+        await Efekt.Ses("sil", 60);
+        Nav.NavigateTo("garaj");
+    }
+}

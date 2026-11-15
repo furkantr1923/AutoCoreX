@@ -1,0 +1,45 @@
+@* Harita altlığı olmadan (çevrimdışı) rotayı ölçekli çizer *@
+<svg class="rota-svg @(Canli ? "canli" : "")" viewBox="0 0 300 200" preserveAspectRatio="xMidYMid meet">
+    <defs>
+        <pattern id="rota-izgara" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M20 0H0V20" fill="none" class="rs-izgara" /></pattern>
+        <linearGradient id="rota-renk" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2BFF88" /><stop offset="1" stop-color="#00E5FF" /></linearGradient>
+    </defs>
+    <rect width="300" height="200" fill="url(#rota-izgara)" />
+    @if (noktalar.Count >= 2)
+    {
+        <polyline points="@cizgi" class="rs-golge" />
+        <polyline points="@cizgi" class="rs-cizgi" pathLength="1000" />
+        <circle cx="@(noktalar[0].X)" cy="@(noktalar[0].Y)" r="6" class="rs-bas" />
+        <circle cx="@(noktalar[^1].X)" cy="@(noktalar[^1].Y)" r="6" class="rs-son" />
+    }
+    else
+    {
+        <g><text x="150" y="104" class="rs-bos">Rota için yeterli GPS noktası yok</text></g>
+    }
+</svg>
+
+@code {
+    [Parameter] public List<double[]> Rota { get; set; } = new();
+    [Parameter] public bool Canli { get; set; }
+
+    private record Nokta(string X, string Y);
+    private List<Nokta> noktalar = new();
+    private string cizgi = "";
+
+    protected override void OnParametersSet()
+    {
+        noktalar = new();
+        if (Rota.Count < 2) { cizgi = ""; return; }
+        // basit eşdikdörtgen izdüşüm (kısa mesafeler için yeterli)
+        var ortaEnlem = Rota.Average(p => p[0]) * Math.PI / 180;
+        var xs = Rota.Select(p => p[1] * Math.Cos(ortaEnlem)).ToList();
+        var ys = Rota.Select(p => -p[0]).ToList();
+        double minX = xs.Min(), maxX = xs.Max(), minY = ys.Min(), maxY = ys.Max();
+        var olcek = Math.Min(260 / Math.Max(maxX - minX, 1e-9), 160 / Math.Max(maxY - minY, 1e-9));
+        var dx = (300 - (maxX - minX) * olcek) / 2;
+        var dy = (200 - (maxY - minY) * olcek) / 2;
+        for (var i = 0; i < xs.Count; i++)
+            noktalar.Add(new Nokta(S.N(dx + (xs[i] - minX) * olcek), S.N(dy + (ys[i] - minY) * olcek)));
+        cizgi = string.Join(" ", noktalar.Select(n => $"{n.X},{n.Y}"));
+    }
+}

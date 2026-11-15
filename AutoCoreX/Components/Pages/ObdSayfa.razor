@@ -1,0 +1,163 @@
+@page "/obd"
+@inject ObdServisi ObdSrv
+@inject Ayarlar Ayar
+@inject Efekt Efekt
+@implements IDisposable
+
+<SayfaBaslik Ust="ELM327 · BLUETOOTH" Baslik="OBD bağlantısı" Geri="menu" />
+
+<section class="panel obd-hero giris-anim durum-@ObdSrv.Durum.ToString().ToLowerInvariant()">
+    <div class="oh-ikon"><i></i><i></i><Ikon Ad="bluetooth" Boyut="38" /></div>
+    <div class="oh-yazi">
+        <b>@DurumMetni</b>
+        <small>@(ObdSrv.CihazAdi ?? "Adaptör seçilmedi")@(ObdSrv.Protokol != null && ObdSrv.Canli ? " · " + ObdSrv.Protokol : "")</small>
+    </div>
+    @if (ObdSrv.Canli)
+    {
+        <button class="btn btn-tehlike-hayalet btn-kucuk" @onclick="Kes">Kes</button>
+    }
+</section>
+
+@if (ObdSrv.Hata != null && !ObdSrv.Canli)
+{
+    <div class="not-kutu tehlike"><Ikon Ad="uyari" Boyut="18" /><span>@ObdSrv.Hata</span></div>
+}
+
+@if (!ObdSrv.Canli)
+{
+    <section class="panel giris-anim" style="--i:1">
+        <div class="panel-baslik"><span>NASIL BAĞLANIR?</span></div>
+        <ol class="adimlar">
+            <li>Adaptörü aracın OBD soketine tak (genelde direksiyonun altında).</li>
+            <li>Kontağı aç (motoru çalıştırmak şart değil).</li>
+            <li>Telefonun <b>Ayarlar › Bluetooth</b> menüsünden adaptörle eşleş (PIN genelde <b>1234</b> veya <b>0000</b>).</li>
+            <li>Aşağıdan adaptörünü seç ve <b>Bağlan</b>'a dokun.</li>
+        </ol>
+    </section>
+
+    <section class="giris-anim" style="--i:2">
+        <div class="bolum-baslik">
+            <span>EŞLEŞMİŞ CİHAZLAR</span>
+            <button class="btn btn-hayalet btn-kucuk" @onclick="Listele"><Ikon Ad="ara" Boyut="14" /> Yenile</button>
+        </div>
+        @if (uyari != null)
+        {
+            <div class="not-kutu"><Ikon Ad="bilgi" Boyut="18" /><span>@uyari</span></div>
+        }
+        @foreach (var c in cihazlar)
+        {
+            <div class="liste-satir cihaz @(c.Adres == Ayar.SonObdAdres ? "son" : "")">
+                <div class="ls-ikon"><Ikon Ad="bluetooth" Boyut="18" /></div>
+                <div class="ls-orta"><b>@c.Ad</b><small class="mono">@c.Adres</small></div>
+                <button class="btn btn-ana btn-kucuk" disabled="@(ObdSrv.Durum == ObdDurum.Baglaniyor)" @onclick="() => Baglan(c)">
+                    @(ObdSrv.Durum == ObdDurum.Baglaniyor && ObdSrv.CihazAdi == c.Ad ? "…" : "Bağlan")
+                </button>
+            </div>
+        }
+    </section>
+
+    <button class="btn btn-hayalet btn-tam" @onclick="Demo"><Ikon Ad="oynat" Boyut="16" /> Adaptörüm yok, demo modunu aç</button>
+}
+else
+{
+    <section class="panel giris-anim" style="--i:1">
+        <div class="panel-baslik"><span>DESTEKLENEN VERİLER</span><small>@(ObdSrv.Demo ? "demo" : ObdSrv.Desteklenen.Count + " PID")</small></div>
+        <div class="pid-izgara">
+            @foreach (var p in Pidler.Hepsi)
+            {
+                var vardir = ObdSrv.Destekli(p.Kod) || (p.Kod == "42" && ObdSrv.Voltaj().HasValue);
+                var d = p.Kod == "42" ? ObdSrv.Voltaj() : ObdSrv.Deger(p.Kod);
+                <div class="pid @(vardir ? "var" : "yok")">
+                    <small class="mono">01 @p.Kod</small>
+                    <span>@p.Ad</span>
+                    <b>@(vardir ? (d.HasValue ? d.Value.ToString("N" + p.Ondalik) + " " + p.Birim : "…") : "Desteklenmiyor")</b>
+                </div>
+            }
+        </div>
+        @if (!ObdSrv.Demo && ObdSrv.AdaptorSurumu != null)
+        {
+            <small class="soluk">Adaptör: @ObdSrv.AdaptorSurumu</small>
+        }
+    </section>
+}
+
+<section class="panel terminal giris-anim" style="--i:3">
+    <div class="panel-baslik"><span>BAĞLANTI GÜNLÜĞÜ</span><i class="imlec"></i></div>
+    <div class="t-icerik">
+        @if (gunluk.Count == 0)
+        {
+            <span class="soluk">&gt; bekleniyor_</span>
+        }
+        @foreach (var s in gunluk)
+        {
+            <div>&gt; @s</div>
+        }
+    </div>
+</section>
+
+<div class="not-kutu soluk-kutu">
+    <Ikon Ad="bilgi" Boyut="18" />
+    <span>Klasik Bluetooth (SPP) ELM327 adaptörler desteklenir. Yalnızca BLE (Bluetooth 4.0 Low Energy) çalışan adaptörler bu sürümde desteklenmez. Bu özellik henüz gerçek araçta test edilmedi.</span>
+</div>
+
+@code {
+    private List<EslesmisCihaz> cihazlar = new();
+    private string? uyari;
+    private List<string> gunluk = new();
+    private DateTime sonCizim;
+
+    private string DurumMetni => ObdSrv.Durum switch
+    {
+        ObdDurum.Bagli => "Bağlı · ECU yanıt veriyor",
+        ObdDurum.Baglaniyor => "Bağlanıyor…",
+        ObdDurum.Demo => "Demo modu açık",
+        _ => "Bağlı değil"
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        ObdSrv.Degisti += Degisti;
+        GunlukAl();
+        if (!ObdSrv.Canli) await Listele();
+    }
+
+    private void GunlukAl() { lock (ObdSrv.Gunluk) gunluk = ObdSrv.Gunluk.TakeLast(40).Reverse().ToList(); }
+
+    private void Degisti()
+    {
+        if ((DateTime.Now - sonCizim).TotalMilliseconds < 250) return;
+        sonCizim = DateTime.Now;
+        InvokeAsync(() => { GunlukAl(); StateHasChanged(); });
+    }
+
+    private async Task Listele()
+    {
+        uyari = null;
+#if ANDROID
+        var izin = await Permissions.CheckStatusAsync<BluetoothIzni>();
+        if (izin != PermissionStatus.Granted) izin = await Permissions.RequestAsync<BluetoothIzni>();
+        if (izin != PermissionStatus.Granted) { uyari = "Bluetooth izni verilmedi. Telefon ayarlarından AutoCore X için 'Yakındaki cihazlar' iznini aç."; return; }
+        uyari = BluetoothObd.Durum();
+        if (uyari != null) return;
+        cihazlar = BluetoothObd.Eslesmisler();
+        if (cihazlar.Count == 0) uyari = "Eşleşmiş cihaz yok. Önce telefonun Bluetooth ayarlarından OBD adaptörüyle eşleş.";
+#else
+        await Task.CompletedTask;
+        uyari = "Bluetooth yalnızca Android'de kullanılabilir.";
+#endif
+    }
+
+    private async Task Baglan(EslesmisCihaz c)
+    {
+        Ayar.SonObdAdres = c.Adres;
+        var ok = await ObdSrv.BaglanAsync(c.Adres, c.Ad);
+        await Efekt.Ses(ok ? "baglan" : "hata", ok ? 60 : 150);
+        GunlukAl();
+    }
+
+    private async Task Demo() { await ObdSrv.DemoBaslatAsync(); await Efekt.Ses("baslat", 50); GunlukAl(); }
+
+    private async Task Kes() { await ObdSrv.DurdurAsync(); await Efekt.Ses("kopma", 40); GunlukAl(); if (!ObdSrv.Canli) await Listele(); }
+
+    public void Dispose() => ObdSrv.Degisti -= Degisti;
+}

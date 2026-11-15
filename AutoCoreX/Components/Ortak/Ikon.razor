@@ -1,0 +1,58 @@
+<svg class="ikon @Sinif" width="@Boyut" height="@Boyut" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="@Kalinlik" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">@((MarkupString)Yol)</svg>
+
+@code {
+    [Parameter] public string Ad { get; set; } = "";
+    [Parameter] public int Boyut { get; set; } = 22;
+    [Parameter] public string Kalinlik { get; set; } = "1.8";
+    [Parameter] public string? Sinif { get; set; }
+
+    private string Yol => Yollar.TryGetValue(Ad, out var y) ? y : Yollar["bilgi"];
+
+    private static readonly Dictionary<string, string> Yollar = new()
+    {
+        ["kokpit"] = "<path d='M12 14l4.5-4.5'/><path d='M3.3 19a10 10 0 1 1 17.4 0'/><circle cx='12' cy='14' r='1.6'/>",
+        ["teshis"] = "<path d='M2 12h4l3-8 4 16 3-8h6'/>",
+        ["arac"] = "<path d='M5 17H3v-4l2-5.5A2 2 0 0 1 6.9 6h10.2a2 2 0 0 1 1.9 1.5L21 13v4h-2'/><path d='M3 13h18'/><circle cx='7.5' cy='17' r='2'/><circle cx='16.5' cy='17' r='2'/><path d='M9.5 17h5'/>",
+        ["bakim"] = "<path d='M14.7 6.3a4 4 0 0 0-5.4 5.2L3 17.8V21h3.2l6.3-6.3a4 4 0 0 0 5.2-5.4l-2.6 2.6-2.4-.6-.6-2.4z'/>",
+        ["yakit"] = "<path d='M4 21V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v16'/><path d='M3 21h12'/><path d='M4 10h10'/><path d='M14 8h2a2 2 0 0 1 2 2v6a1.5 1.5 0 0 0 3 0V9l-3-3'/>",
+        ["rota"] = "<circle cx='6' cy='19' r='2'/><circle cx='18' cy='5' r='2'/><path d='M8 19h8.5a3.5 3.5 0 0 0 0-7h-9a3.5 3.5 0 0 1 0-7H16'/>",
+        ["rapor"] = "<path d='M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z'/><path d='M14 3v6h6'/><path d='M8 13h8M8 17h5'/>",
+        ["bluetooth"] = "<path d='M7 7l10 10-5 5V2l5 5L7 17'/>",
+        ["ayar"] = "<path d='M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12'/><circle cx='16' cy='6' r='2'/><circle cx='10' cy='12' r='2'/><circle cx='18' cy='18' r='2'/>",
+        ["menu"] = "<rect x='3' y='3' width='7' height='7' rx='1.5'/><rect x='14' y='3' width='7' height='7' rx='1.5'/><rect x='3' y='14' width='7' height='7' rx='1.5'/><rect x='14' y='14' width='7' height='7' rx='1.5'/>",
+        ["arti"] = "<path d='M12 5v14M5 12h14'/>",
+        ["geri"] = "<path d='M15 18l-6-6 6-6'/>",
+        ["ileri"] = "<path d='M9 18l6-6-6-6'/>",
+        ["sil"] = "<path d='M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14'/>",
+        ["duzen"] = "<path d='M4 20h4L19 9l-4-4L4 16z'/><path d='M13.5 6.5l4 4'/>",
+        ["uyari"] = "<path d='M12 3l10 18H2z'/><path d='M12 10v4M12 17.5v.5'/>",
+        ["tamam"] = "<path d='M5 12l5 5 9-10'/>",
+        ["kapat"] = "<path d='M6 6l12 12M18 6L6 18'/>",
+        ["foto"] = "<path d='M4 8h3l2-3h6l2 3h3v11H4z'/><circle cx='12' cy='13' r='3.5'/>",
+        ["paylas"] = "<circle cx='18' cy='5' r='2.5'/><circle cx='6' cy='12' r='2.5'/><circle cx='18' cy='19' r='2.5'/><path d='M8.2 10.8l7.6-4.4M8.2 13.2l7.6 4.4'/>",
+        ["konum"] = "<path d='M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z'/><circle cx='12' cy='9.5' r='2.5'/>",
+        ["saat"] = "<circle cx='12' cy='12' r='9'/><path d='M12 7v5l3 2'/>",
+        ["guc"] = "<path d='M12 3v9'/><path d='M6.3 6.3a8 8 0 1 0 11.4 0'/>",
+        ["ara"] = "<circle cx='11' cy='11' r='7'/><path d='M20 20l-3.5-3.5'/>",
+        ["takvim"] = "<rect x='3' y='5' width='18' height='16' rx='2'/><path d='M3 10h18M8 3v4M16 3v4'/>",
+        ["ses"] = "<path d='M4 9v6h4l5 4V5L8 9z'/><path d='M16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11'/>",
+        ["isi"] = "<path d='M14 14.8V5a2 2 0 0 0-4 0v9.8a4 4 0 1 0 4 0z'/><path d='M12 9v6'/>",
+        ["aku"] = "<rect x='3' y='7' width='18' height='12' rx='2'/><path d='M7 7V5M17 7V5M6.5 13h3M15 11.5v3M13.5 13h3'/>",
+        ["grafik"] = "<path d='M4 20V11M10 20V4M16 20v-6M22 20H2'/>",
+        ["bilgi"] = "<circle cx='12' cy='12' r='9'/><path d='M12 11v6M12 7.5v.5'/>",
+        ["oynat"] = "<path d='M7 4l13 8-13 8z'/>",
+        ["dur"] = "<rect x='6' y='6' width='12' height='12' rx='1.5'/>",
+        ["cip"] = "<rect x='6' y='6' width='12' height='12' rx='2'/><path d='M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4'/>",
+        ["kalkan"] = "<path d='M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z'/><path d='M9 12l2 2 4-4'/>",
+        ["zil"] = "<path d='M6 16v-5a6 6 0 0 1 12 0v5l2 2H4z'/><path d='M10 20a2 2 0 0 0 4 0'/>",
+        ["harita"] = "<path d='M9 4L3 6v14l6-2 6 2 6-2V4l-6 2z'/><path d='M9 4v14M15 6v14'/>",
+        ["yag"] = "<path d='M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11z'/>",
+        ["filtre"] = "<path d='M3 5h18l-7 8v6l-4 2v-8z'/>",
+        ["fren"] = "<circle cx='12' cy='12' r='8'/><circle cx='12' cy='12' r='3'/><path d='M5 5l2 2M19 5l-2 2'/>",
+        ["motor"] = "<path d='M4 10h2l2-2h6l2 2h2v2h2v-2h1v7h-1v-2h-2v2h-2l-2 2H8l-2-2H4z'/>",
+        ["lastik"] = "<circle cx='12' cy='12' r='9'/><circle cx='12' cy='12' r='4'/><path d='M12 3v5M12 16v5M3 12h5M16 12h5'/>",
+        ["anahtar"] = "<circle cx='8' cy='15' r='4'/><path d='M11 12l9-9M17 6l3 3'/>",
+        ["simsek"] = "<path d='M13 2L4 14h7l-1 8 9-12h-7z'/>",
+        ["kilit"] = "<rect x='5' y='11' width='14' height='10' rx='2'/><path d='M8 11V7a4 4 0 0 1 8 0v4'/>",
+    };
+}

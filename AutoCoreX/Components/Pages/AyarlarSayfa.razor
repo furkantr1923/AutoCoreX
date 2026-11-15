@@ -1,0 +1,114 @@
+@page "/ayarlar"
+@inject Ayarlar Ayar
+@inject Efekt Efekt
+@inject Veri Veri
+@inject ObdServisi ObdSrv
+@inject NavigationManager Nav
+
+<SayfaBaslik Ust="SİSTEM" Baslik="Ayarlar" Geri="menu" />
+
+<section class="panel form giris-anim">
+    <div class="panel-baslik"><span>DENEYİM</span></div>
+    <label class="anahtar">
+        <input type="checkbox" checked="@ses" @onchange="SesDegisti" />
+        <span class="ray"></span>
+        <span>Ses efektleri</span>
+    </label>
+    <label class="anahtar">
+        <input type="checkbox" checked="@titresim" @onchange="TitresimDegisti" />
+        <span class="ray"></span>
+        <span>Titreşim</span>
+    </label>
+    <label class="anahtar">
+        <input type="checkbox" checked="@acilis" @onchange="AcilisDegisti" />
+        <span class="ray"></span>
+        <span>Açılışta "Engine Start" ekranı</span>
+    </label>
+    <div class="ses-test">
+        @foreach (var s in Sesler)
+        {
+            <button class="btn btn-hayalet btn-kucuk sessiz" @onclick="() => Dene(s.Ad)">@s.Etiket</button>
+        }
+    </div>
+</section>
+
+<section class="panel form giris-anim" style="--i:1">
+    <div class="panel-baslik"><span>BİLDİRİMLER</span></div>
+    <small class="soluk">Geciken veya yaklaşan bakım varsa uygulamayı açtığında günde bir kez bildirim gösterilir.</small>
+    <button class="btn btn-hayalet" @onclick="BildirimIzniIste"><Ikon Ad="zil" Boyut="16" /> Bildirim iznini kontrol et</button>
+    @if (bildirimDurum != null) { <small class="soluk">@bildirimDurum</small> }
+</section>
+
+<section class="panel form giris-anim" style="--i:2">
+    <div class="panel-baslik"><span>VERİ</span></div>
+    <small class="soluk">Tüm kayıtlar yalnızca bu telefonda saklanır. İnternete veri gönderilmez.</small>
+    @if (!silOnay)
+    {
+        <button class="btn btn-tehlike-hayalet" @onclick="() => silOnay = true"><Ikon Ad="sil" Boyut="16" /> Tüm verileri sil</button>
+    }
+    else
+    {
+        <div class="not-kutu tehlike"><span>Araçlar, bakım, yakıt, yolculuk ve tarama kayıtlarının <b>tamamı</b> kalıcı olarak silinecek.</span></div>
+        <div class="eylem-satiri">
+            <button class="btn btn-hayalet" @onclick="() => silOnay = false">Vazgeç</button>
+            <button class="btn btn-tehlike" @onclick="TumunuSil">Evet, hepsini sil</button>
+        </div>
+    }
+</section>
+
+<section class="panel giris-anim hakkinda" style="--i:3">
+    <div class="panel-baslik"><span>HAKKINDA</span></div>
+    <p><b>AutoCore X</b> v1.0 · Furkan Baykal</p>
+    <p class="soluk">Bağımsız, kişisel bir yazılım projesidir; herhangi bir araç üreticisi veya servis ağının resmî uygulaması değildir. Arıza kodu açıklamaları ve sağlık skoru <b>bilgilendirme amaçlıdır</b>, kesin teşhis yerine geçmez. DEMO etiketli tüm değerler simülasyondur. OBD işlemleri salt okunurdur; araca hiçbir komut yazılmaz.</p>
+    <p class="soluk">Sürüş sırasında uygulamayı kullanmayın; trafik güvenliği her şeyden önce gelir.</p>
+</section>
+
+@code {
+    private bool ses, titresim, acilis, silOnay;
+    private string? bildirimDurum;
+
+    private static readonly (string Ad, string Etiket)[] Sesler =
+    {
+        ("kontak", "Kontak"), ("baglan", "Bağlantı"), ("onay", "Onay"), ("uyari", "Uyarı"), ("tarama", "Tarama")
+    };
+
+    protected override void OnInitialized()
+    {
+        ses = Ayar.Ses; titresim = Ayar.Titresim; acilis = Ayar.AcilisAnimasyonu;
+    }
+
+    private async Task SesDegisti(ChangeEventArgs e)
+    {
+        ses = e.Value is true;
+        Ayar.Ses = ses;
+        await Efekt.Esitle();
+        if (ses) await Efekt.Ses("onay");
+    }
+
+    private void TitresimDegisti(ChangeEventArgs e)
+    {
+        titresim = e.Value is true;
+        Ayar.Titresim = titresim;
+        Efekt.Titret(60);
+    }
+
+    private void AcilisDegisti(ChangeEventArgs e) { acilis = e.Value is true; Ayar.AcilisAnimasyonu = acilis; }
+
+    private async Task Dene(string ad) => await Efekt.Ses(ad, 30);
+
+    private async Task BildirimIzniIste()
+    {
+        var d = await Permissions.CheckStatusAsync<BildirimIzni>();
+        if (d != PermissionStatus.Granted) d = await Permissions.RequestAsync<BildirimIzni>();
+        bildirimDurum = d == PermissionStatus.Granted ? "✓ Bildirim izni açık." : "Bildirim izni kapalı. Telefon ayarlarından açabilirsin.";
+    }
+
+    private async Task TumunuSil()
+    {
+        await ObdSrv.DurdurAsync();
+        await Veri.TumunuSilAsync();
+        await Efekt.Ses("sil", 120);
+        silOnay = false;
+        Nav.NavigateTo("");
+    }
+}

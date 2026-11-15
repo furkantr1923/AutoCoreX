@@ -1,0 +1,20 @@
+@inject ObdServisi Obd
+@implements IDisposable
+
+<span class="rozet @Sinif"><i class="nokta"></i>@Obd.KaynakEtiketi</span>
+
+@code {
+    private string Sinif => Obd.Durum switch { ObdDurum.Demo => "demo", ObdDurum.Bagli => "canli", ObdDurum.Baglaniyor => "bekle", _ => "yok" };
+    private ObdDurum _onceki;
+
+    protected override void OnInitialized() { _onceki = Obd.Durum; Obd.Degisti += Guncelle; }
+
+    private void Guncelle()
+    {
+        if (Obd.Durum == _onceki) return;   // yalnızca durum değişince çiz
+        _onceki = Obd.Durum;
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose() => Obd.Degisti -= Guncelle;
+}

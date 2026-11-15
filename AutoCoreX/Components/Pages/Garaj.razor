@@ -1,0 +1,77 @@
+@page "/garaj"
+@inject Veri Veri
+@inject Efekt Efekt
+
+<SayfaBaslik Ust="ARAÇ PROFİLLERİ" Baslik="Garaj">
+    <a class="btn btn-ana btn-ikon" href="arac/yeni" aria-label="Araç ekle"><Ikon Ad="arti" Boyut="20" /></a>
+</SayfaBaslik>
+
+@if (yuklendi && araclar.Count == 0)
+{
+    <div class="panel karsilama giris-anim">
+        <div class="kar-ikon"><Ikon Ad="arac" Boyut="44" Kalinlik="1.4" /></div>
+        <h2>Henüz araç yok</h2>
+        <p class="soluk">Kendi aracını ekle ya da aile aracını tek dokunuşla hazır bilgilerle oluştur.</p>
+        <button class="btn btn-ana btn-tam" @onclick="HizliEkle"><Ikon Ad="simsek" Boyut="18" /> 2016 Peugeot 2008 1.6 HDi ekle</button>
+        <a class="btn btn-hayalet btn-tam" href="arac/yeni"><Ikon Ad="arti" Boyut="18" /> Farklı araç ekle</a>
+    </div>
+}
+
+@for (var i = 0; i < araclar.Count; i++)
+{
+    var a = araclar[i];
+    var aktif = a.Id == aktifId;
+    <div class="arac-kart giris-anim @(aktif ? "aktif" : "")" style="--i:@i" @key="a.Id">
+        <div class="ak-gorsel"><AracGorsel Yol="@a.FotoYolu" /></div>
+        <div class="ak-bilgi">
+            @if (aktif) { <span class="rozet canli"><i class="nokta"></i>AKTİF</span> }
+            <h3>@a.TamAd</h3>
+            <small>@a.Ozet</small>
+            <div class="ak-veri">
+                <span><Ikon Ad="kokpit" Boyut="14" /> @S.Km(a.Km)</span>
+                @if (!string.IsNullOrWhiteSpace(a.Plaka)) { <span class="plaka">@a.Plaka</span> }
+            </div>
+        </div>
+        <div class="ak-eylem">
+            @if (!aktif)
+            {
+                <button class="btn btn-hayalet btn-kucuk" @onclick="() => AktifYap(a.Id)">Aktif yap</button>
+            }
+            <a class="btn btn-hayalet btn-kucuk" href="arac/@a.Id"><Ikon Ad="duzen" Boyut="14" /> Düzenle</a>
+        </div>
+    </div>
+}
+
+@code {
+    private List<Arac> araclar = new();
+    private int aktifId;
+    private bool yuklendi;
+
+    protected override async Task OnInitializedAsync() => await Yukle();
+
+    private async Task Yukle()
+    {
+        araclar = await Veri.AraclarAsync();
+        aktifId = (await Veri.AktifAracAsync())?.Id ?? 0;
+        yuklendi = true;
+    }
+
+    private async Task AktifYap(int id)
+    {
+        Veri.AktifAracId = id;
+        aktifId = id;
+        await Efekt.Ses("onay", 30);
+    }
+
+    private async Task HizliEkle()
+    {
+        var a = new Arac
+        {
+            Marka = "Peugeot", Model = "2008 Allure", Yil = 2016, MotorTipi = "1.6 HDi", YakitTipi = "Dizel",
+            Sanziman = "Manuel", MotorHacmi = 1560, Km = 0, Notlar = "Kilometreyi güncellemeyi unutma."
+        };
+        await Veri.AracKaydetAsync(a);
+        await Efekt.Ses("kayit", 40);
+        await Yukle();
+    }
+}

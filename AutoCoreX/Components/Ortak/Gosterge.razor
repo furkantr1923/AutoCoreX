@@ -1,0 +1,99 @@
+@* Kadranlı gösterge: 240° yay, animasyonlu ibre, kırmızı bölge *@
+<div class="gosterge @(Deger == null ? "verisiz" : "") @(Kirmizida ? "kirmizi-bolge" : "")" style="width:@(Boyut)px;height:@(Boyut)px">
+    <svg viewBox="0 0 200 200">
+        <defs>
+            <linearGradient id="@($"g-{Kimlik}")" x1="0" y1="1" x2="1" y2="0">
+                <stop offset="0" stop-color="#2D7CFF" />
+                <stop offset="1" stop-color="#00E5FF" />
+            </linearGradient>
+        </defs>
+        <path d="@YayYolu" class="g-zemin" pathLength="100" />
+        @if (KirmiziBaslangic.HasValue)
+        {
+            <path d="@KirmiziYol" class="g-kirmizi" />
+        }
+        <path d="@YayYolu" class="g-dolu" pathLength="100" stroke="@($"url(#g-{Kimlik})")" style="stroke-dashoffset:@S.N(100 - Oran * 100)" />
+        @foreach (var c in Cizgiler)
+        {
+            <g>
+                <line x1="@c.X1" y1="@c.Y1" x2="@c.X2" y2="@c.Y2" class="@(c.Buyuk ? "g-cizgi buyuk" : "g-cizgi")" />
+                <text x="@c.TX" y="@c.TY" class="g-etiket">@c.Etiket</text>
+            </g>
+        }
+        <g class="g-ibre" style="transform:rotate(@(S.N(Oran * 240))deg)">
+            <line x1="100" y1="100" x2="@S.N(100 + 70 * Math.Cos(Rad(150)))" y2="@S.N(100 + 70 * Math.Sin(Rad(150)))" />
+        </g>
+        <circle cx="100" cy="100" r="7" class="g-gobek" />
+    </svg>
+    <div class="g-merkez">
+        @if (ChildContent != null)
+        {
+            @ChildContent
+        }
+        else
+        {
+            <b>@(Deger.HasValue ? Deger.Value.ToString("N" + Ondalik) : "—")</b>
+            <small>@Birim</small>
+        }
+    </div>
+    @if (Etiket != null) { <div class="g-alt">@Etiket</div> }
+</div>
+
+@code {
+    [Parameter] public double? Deger { get; set; }
+    [Parameter] public double Min { get; set; }
+    [Parameter] public double Max { get; set; } = 100;
+    [Parameter] public double? KirmiziBaslangic { get; set; }
+    [Parameter] public int Boyut { get; set; } = 160;
+    [Parameter] public int Ondalik { get; set; }
+    [Parameter] public string? Birim { get; set; }
+    [Parameter] public string? Etiket { get; set; }
+    [Parameter] public int AnaBolum { get; set; } = 6;
+    [Parameter] public double EtiketBolen { get; set; } = 1;
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    private readonly string Kimlik = Guid.NewGuid().ToString("N")[..6];
+    private double Oran => Deger.HasValue ? Math.Clamp((Deger.Value - Min) / (Max - Min), 0, 1) : 0;
+    private bool Kirmizida => Deger.HasValue && KirmiziBaslangic.HasValue && Deger >= KirmiziBaslangic;
+
+    private static double Rad(double d) => d * Math.PI / 180;
+    private static string Nokta(double aci, double r) => $"{S.N(100 + r * Math.Cos(Rad(aci)))} {S.N(100 + r * Math.Sin(Rad(aci)))}";
+
+    private const double R = 84;
+    private string YayYolu => $"M {Nokta(150, R)} A {S.N(R)} {S.N(R)} 0 1 1 {Nokta(30, R)}";
+
+    private string KirmiziYol
+    {
+        get
+        {
+            var t = Math.Clamp((KirmiziBaslangic!.Value - Min) / (Max - Min), 0, 1);
+            var bas = 150 + 240 * t;
+            var buyuk = (390 - bas) > 180 ? 1 : 0;
+            return $"M {Nokta(bas, R)} A {S.N(R)} {S.N(R)} 0 {buyuk} 1 {Nokta(30, R)}";
+        }
+    }
+
+    private record Cizgi(string X1, string Y1, string X2, string Y2, bool Buyuk, string? Etiket, string TX, string TY);
+
+    private List<Cizgi> Cizgiler
+    {
+        get
+        {
+            var l = new List<Cizgi>();
+            var adet = AnaBolum * 2;
+            for (var i = 0; i <= adet; i++)
+            {
+                var aci = 150 + 240.0 * i / adet;
+                var buyuk = i % 2 == 0;
+                double r1 = buyuk ? 66 : 70, r2 = 76;
+                string? et = buyuk ? ((Min + (Max - Min) * i / adet) / EtiketBolen).ToString("0") : null;
+                l.Add(new Cizgi(
+                    S.N(100 + r1 * Math.Cos(Rad(aci))), S.N(100 + r1 * Math.Sin(Rad(aci))),
+                    S.N(100 + r2 * Math.Cos(Rad(aci))), S.N(100 + r2 * Math.Sin(Rad(aci))),
+                    buyuk, et,
+                    S.N(100 + 54 * Math.Cos(Rad(aci))), S.N(100 + 54 * Math.Sin(Rad(aci)) + 3.5)));
+            }
+            return l;
+        }
+    }
+}

@@ -1,0 +1,10 @@
+<Router AppAssembly="@typeof(MauiProgram).Assembly">
+    <Found Context="routeData">
+        <RouteView RouteData="@routeData" DefaultLayout="@typeof(Layout.MainLayout)" />
+    </Found>
+    <NotFound>
+        <LayoutView Layout="@typeof(Layout.MainLayout)">
+            <div class="bos"><b>Sayfa bulunamadı</b><a class="btn btn-ana" href="">Kokpite dön</a></div>
+        </LayoutView>
+    </NotFound>
+</Router>

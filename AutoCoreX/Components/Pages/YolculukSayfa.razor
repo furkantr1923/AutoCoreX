@@ -1,0 +1,101 @@
+@page "/yolculuk"
+@inject Veri Veri
+@inject GpsServisi Gps
+@inject Efekt Efekt
+@inject NavigationManager Nav
+@implements IDisposable
+
+<SayfaBaslik Ust="GPS TELEMETRİ" Baslik="Yolculuk" />
+<ServisSekme />
+
+@if (yuklendi && arac == null)
+{
+    <AracYok Metin="Yolculuklar aktif araca kaydedilir." />
+}
+else if (arac != null)
+{
+    <section class="panel yolculuk-canli giris-anim @(Gps.Aktif ? "aktif" : "")">
+        <div class="yc-ust">
+            <span class="rozet @(Gps.Aktif ? "canli" : "yok")"><i class="nokta"></i>@(Gps.Aktif ? "KAYITTA" : "HAZIR")</span>
+            @if (Gps.Aktif && Gps.Dogruluk.HasValue)
+            {
+                <small class="soluk">GPS ±@Gps.Dogruluk.Value.ToString("0") m</small>
+            }
+        </div>
+        <div class="yc-mesafe"><b>@Gps.MesafeKm.ToString("0.00")</b><span>km</span></div>
+        <div class="izgara-3 yc-veri">
+            <div><small>SÜRE</small><b>@(Gps.Aktif ? Gps.Sure.ToString("hh\\:mm\\:ss") : "00:00:00")</b></div>
+            <div><small>ANLIK</small><b>@Gps.AnlikHiz.ToString("0")</b><span>km/s</span></div>
+            <div><small>MAKS</small><b>@Gps.MaksHiz.ToString("0")</b><span>km/s</span></div>
+        </div>
+        @if (Gps.Aktif)
+        {
+            <button class="btn btn-tehlike btn-tam btn-buyuk" @onclick="Durdur"><Ikon Ad="dur" Boyut="18" /> Yolculuğu bitir</button>
+            <small class="soluk orta-yazi">Ekran açık tutuluyor. Kayıt yalnızca uygulama açıkken yapılır.</small>
+        }
+        else
+        {
+            <button class="btn btn-ana btn-tam btn-buyuk nabizli" @onclick="Baslat"><Ikon Ad="oynat" Boyut="18" /> Yolculuğu başlat</button>
+            <small class="soluk orta-yazi">Konum yalnızca sen başlattığında ve uygulama açıkken alınır.</small>
+        }
+        @if (hata != null) { <div class="not-kutu tehlike"><Ikon Ad="uyari" Boyut="18" /><span>@hata</span></div> }
+    </section>
+
+    <section class="giris-anim" style="--i:1">
+        <div class="bolum-baslik"><span>GEÇMİŞ</span><small>@liste.Count yolculuk · @liste.Sum(y => y.MesafeKm).ToString("N0") km</small></div>
+        @if (liste.Count == 0)
+        {
+            <div class="bos"><Ikon Ad="rota" Boyut="36" Kalinlik="1.3" /><b>Kayıtlı yolculuk yok</b><small>İlk yolculuğunu başlat; mesafe, süre ve rota kaydedilir.</small></div>
+        }
+        @foreach (var y in liste)
+        {
+            <a class="liste-satir dokun" href="yolculuk/@y.Id">
+                <div class="ls-ikon"><Ikon Ad="rota" Boyut="18" /></div>
+                <div class="ls-orta">
+                    <b>@y.MesafeKm.ToString("0.0") km · @S.Sure(y.Sure)</b>
+                    <small>@y.Baslangic.ToString("dd MMM yyyy HH:mm") · ort. @y.OrtHiz.ToString("0") km/s</small>
+                </div>
+                <Ikon Ad="ileri" Boyut="18" Sinif="soluk" />
+            </a>
+        }
+    </section>
+}
+
+@code {
+    private Arac? arac;
+    private bool yuklendi;
+    private List<Yolculuk> liste = new();
+    private string? hata;
+    private System.Threading.Timer? saat;
+
+    protected override async Task OnInitializedAsync()
+    {
+        arac = await Veri.AktifAracAsync();
+        if (arac != null) liste = await Veri.YolculuklarAsync(arac.Id);
+        yuklendi = true;
+        Gps.Degisti += Yenile;
+        saat = new System.Threading.Timer(_ => { if (Gps.Aktif) Yenile(); }, null, 1000, 1000);
+    }
+
+    private void Yenile() => InvokeAsync(StateHasChanged);
+
+    private async Task Baslat()
+    {
+        hata = await Gps.BaslatAsync(arac!.Id);
+        await Efekt.Ses(hata == null ? "baslat" : "hata", 60);
+    }
+
+    private async Task Durdur()
+    {
+        var y = await Gps.DurdurAsync();
+        await Efekt.Ses("kayit", 50);
+        if (y != null) Nav.NavigateTo($"yolculuk/{y.Id}");
+        else hata = "Yolculuk çok kısa olduğu için kaydedilmedi.";
+    }
+
+    public void Dispose()
+    {
+        Gps.Degisti -= Yenile;
+        saat?.Dispose();
+    }
+}

@@ -1,0 +1,84 @@
+@page "/yakit/yeni"
+@page "/yakit/{Id:int}"
+@inject Veri Veri
+@inject Efekt Efekt
+@inject NavigationManager Nav
+
+<SayfaBaslik Ust="YAKIT DOLUMU" Baslik="@(Id == null ? "Yeni dolum" : "Dolum kaydı")" Geri="yakit" />
+
+<div class="panel form giris-anim">
+    <div class="izgara-2">
+        <label class="alan">Tarih<input class="girdi" type="date" @bind="y.Tarih" /></label>
+        <label class="alan">Kilometre *<input class="girdi" type="number" min="0" @bind="y.Km" /></label>
+    </div>
+    <div class="izgara-3">
+        <label class="alan">Litre<input class="girdi" type="number" min="0" step="0.01" @bind="y.Litre" @bind:after="LitreDegisti" /></label>
+        <label class="alan">Litre fiyatı<input class="girdi" type="number" min="0" step="0.01" @bind="y.LitreFiyat" @bind:after="FiyatDegisti" /></label>
+        <label class="alan">Toplam ₺<input class="girdi" type="number" min="0" step="0.01" @bind="y.Toplam" @bind:after="ToplamDegisti" /></label>
+    </div>
+    <small class="soluk">İkisini gir, üçüncüsü otomatik hesaplanır.</small>
+    <div class="izgara-2">
+        <label class="alan">Yakıt türü
+            <select class="girdi" @bind="y.YakitTuru">
+                @foreach (var t in Turler)
+                {
+                    <option value="@t">@t</option>
+                }
+            </select>
+        </label>
+        <label class="alan">İstasyon<input class="girdi" @bind="y.Istasyon" placeholder="İsteğe bağlı" /></label>
+    </div>
+    <label class="anahtar">
+        <input type="checkbox" @bind="y.DepoDolu" />
+        <span class="ray"></span>
+        <span>Depo full dolduruldu <small class="soluk">(tüketim hesabı için gerekli)</small></span>
+    </label>
+    <label class="alan">Not<textarea class="girdi" rows="2" @bind="y.Not"></textarea></label>
+</div>
+
+@if (hata != null) { <div class="not-kutu tehlike"><Ikon Ad="uyari" Boyut="18" /><span>@hata</span></div> }
+
+<button class="btn btn-ana btn-tam btn-buyuk" @onclick="Kaydet"><Ikon Ad="tamam" Boyut="18" /> Kaydet</button>
+@if (Id != null)
+{
+    <button class="btn btn-tehlike-hayalet btn-tam" @onclick="Sil"><Ikon Ad="sil" Boyut="16" /> Kaydı sil</button>
+}
+
+@code {
+    [Parameter] public int? Id { get; set; }
+    private YakitKaydi y = new();
+    private string? hata;
+    private static readonly string[] Turler = { "Dizel", "Benzin", "LPG", "Premium dizel", "Premium benzin", "Elektrik (kWh)" };
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (Id is int id) y = await Veri.YakitAsync(id) ?? new YakitKaydi();
+        else
+        {
+            var a = await Veri.AktifAracAsync();
+            y = new YakitKaydi { AracId = a?.Id ?? 0, Km = a?.Km ?? 0, YakitTuru = a?.YakitTipi == "Benzin" ? "Benzin" : a?.YakitTipi == "LPG + Benzin" ? "LPG" : "Dizel" };
+        }
+    }
+
+    private void LitreDegisti() { if (y.LitreFiyat > 0) y.Toplam = Math.Round(y.Litre * y.LitreFiyat, 2); else if (y.Toplam > 0 && y.Litre > 0) y.LitreFiyat = Math.Round(y.Toplam / y.Litre, 2); }
+    private void FiyatDegisti() { if (y.Litre > 0) y.Toplam = Math.Round(y.Litre * y.LitreFiyat, 2); else if (y.Toplam > 0 && y.LitreFiyat > 0) y.Litre = Math.Round(y.Toplam / y.LitreFiyat, 2); }
+    private void ToplamDegisti() { if (y.LitreFiyat > 0) y.Litre = Math.Round(y.Toplam / y.LitreFiyat, 2); else if (y.Litre > 0) y.LitreFiyat = Math.Round(y.Toplam / y.Litre, 2); }
+
+    private async Task Kaydet()
+    {
+        hata = null;
+        if (y.AracId == 0) { hata = "Önce garajdan bir araç ekleyin."; return; }
+        if (y.Km <= 0) { hata = "Kilometre gerekli."; await Efekt.Ses("hata", 100); return; }
+        if (y.Litre <= 0 || y.Toplam <= 0) { hata = "Litre ve toplam tutar sıfırdan büyük olmalı."; await Efekt.Ses("hata", 100); return; }
+        await Veri.YakitKaydetAsync(y);
+        await Efekt.Ses("kayit", 40);
+        Nav.NavigateTo("yakit");
+    }
+
+    private async Task Sil()
+    {
+        await Veri.YakitSilAsync(y.Id);
+        await Efekt.Ses("sil", 60);
+        Nav.NavigateTo("yakit");
+    }
+}

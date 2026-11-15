@@ -1,0 +1,133 @@
+@page "/bakim/yeni"
+@page "/bakim/{Id:int}"
+@inject Veri Veri
+@inject Cihaz Cihaz
+@inject Efekt Efekt
+@inject NavigationManager Nav
+
+<SayfaBaslik Ust="SERVİS KAYDI" Baslik="@(Id == null ? "Yeni bakım" : "Bakım kaydı")" Geri="bakim" />
+
+<div class="tur-secici giris-anim">
+    @for (var i = 0; i < Hesap.BakimTurleri.Length; i++)
+    {
+        var t = Hesap.BakimTurleri[i];
+        <button class="tur-cip @(b.Tur == t.Ad ? "secili" : "")" style="--i:@i" @onclick="() => TurSec(t)">
+            <Ikon Ad="@t.Ikon" Boyut="18" />
+            <span>@t.Ad</span>
+        </button>
+    }
+</div>
+
+<div class="panel form giris-anim" style="--i:1">
+    <div class="izgara-2">
+        <label class="alan">Tarih<input class="girdi" type="date" @bind="b.Tarih" /></label>
+        <label class="alan">Kilometre<input class="girdi" type="number" min="0" @bind="b.Km" /></label>
+    </div>
+    <div class="izgara-2">
+        <label class="alan">Maliyet (₺)<input class="girdi" type="number" min="0" step="0.01" @bind="b.Maliyet" /></label>
+        <label class="alan">Servis<input class="girdi" @bind="b.Servis" placeholder="Servis adı" /></label>
+    </div>
+    <label class="alan">İşlem açıklaması<textarea class="girdi" rows="2" @bind="b.Aciklama" placeholder="Örn. 5W-30 yağ, orijinal filtre"></textarea></label>
+
+    <div class="bolum-baslik ic"><span>SONRAKİ BAKIM</span><small>@Ipucu</small></div>
+    <div class="izgara-2">
+        <label class="alan">Sonraki km<input class="girdi" type="number" min="0" @bind="b.SonrakiKm" /></label>
+        <label class="alan">Sonraki tarih<input class="girdi" type="date" @bind="b.SonrakiTarih" /></label>
+    </div>
+    <button class="btn btn-hayalet btn-kucuk" @onclick="Otomatik"><Ikon Ad="simsek" Boyut="14" /> Önerilen aralıkla doldur</button>
+
+    <div class="bolum-baslik ic"><span>FATURA / FOTOĞRAF</span></div>
+    @if (foto != null)
+    {
+        <div class="fatura"><img src="@foto" alt="Fatura" /><button class="btn btn-tehlike-hayalet btn-kucuk" @onclick="FotoKaldir"><Ikon Ad="sil" Boyut="14" /> Kaldır</button></div>
+    }
+    else
+    {
+        <button class="btn btn-hayalet" @onclick="FotoSec"><Ikon Ad="foto" Boyut="16" /> Fotoğraf ekle</button>
+    }
+</div>
+
+@if (hata != null) { <div class="not-kutu tehlike"><Ikon Ad="uyari" Boyut="18" /><span>@hata</span></div> }
+
+<button class="btn btn-ana btn-tam btn-buyuk" @onclick="Kaydet"><Ikon Ad="tamam" Boyut="18" /> Kaydet</button>
+@if (Id != null)
+{
+    <button class="btn btn-tehlike-hayalet btn-tam" @onclick="Sil"><Ikon Ad="sil" Boyut="16" /> Kaydı sil</button>
+}
+
+@code {
+    [Parameter] public int? Id { get; set; }
+    private BakimKaydi b = new();
+    private Arac? arac;
+    private string? foto, hata;
+
+    private string Ipucu
+    {
+        get
+        {
+            var t = Hesap.Tur(b.Tur);
+            var p = new List<string>();
+            if (t.AralikKm.HasValue) p.Add($"{t.AralikKm:N0} km");
+            if (t.AralikAy.HasValue) p.Add($"{t.AralikAy} ay");
+            return p.Count == 0 ? "genel öneri yok" : "öneri: " + string.Join(" / ", p);
+        }
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        arac = await Veri.AktifAracAsync();
+        if (Id is int id)
+        {
+            b = await Veri.BakimAsync(id) ?? new BakimKaydi();
+            foto = await Cihaz.GorselAsync(b.FotoYolu);
+        }
+        else
+        {
+            b = new BakimKaydi { AracId = arac?.Id ?? 0, Km = arac?.Km ?? 0 };
+            Otomatik();
+        }
+    }
+
+    private void TurSec(BakimTuru t)
+    {
+        b.Tur = t.Ad;
+        if (Id == null) Otomatik();
+    }
+
+    // Aracın kullanım kılavuzu her zaman önceliklidir; bu değerler genel önerilerdir
+    private void Otomatik()
+    {
+        var t = Hesap.Tur(b.Tur);
+        b.SonrakiKm = t.AralikKm.HasValue ? b.Km + t.AralikKm.Value : null;
+        b.SonrakiTarih = t.AralikAy.HasValue ? b.Tarih.AddMonths(t.AralikAy.Value) : null;
+    }
+
+    private async Task FotoSec()
+    {
+        var yol = await Cihaz.FotoSecAsync();
+        if (yol == null) return;
+        Cihaz.DosyaSil(b.FotoYolu);
+        b.FotoYolu = yol;
+        foto = await Cihaz.GorselAsync(yol);
+    }
+
+    private void FotoKaldir() { Cihaz.DosyaSil(b.FotoYolu); b.FotoYolu = null; foto = null; }
+
+    private async Task Kaydet()
+    {
+        hata = null;
+        if (b.AracId == 0) { hata = "Önce garajdan bir araç ekleyin."; return; }
+        if (b.Km < 0 || b.Maliyet < 0) { hata = "Kilometre ve maliyet negatif olamaz."; await Efekt.Ses("hata", 100); return; }
+        if (b.SonrakiKm.HasValue && b.SonrakiKm <= b.Km) { hata = "Sonraki bakım km'si, bakım km'sinden büyük olmalı."; await Efekt.Ses("hata", 100); return; }
+        await Veri.BakimKaydetAsync(b);
+        await Efekt.Ses("kayit", 40);
+        Nav.NavigateTo("bakim");
+    }
+
+    private async Task Sil()
+    {
+        await Veri.BakimSilAsync(b.Id);
+        await Efekt.Ses("sil", 60);
+        Nav.NavigateTo("bakim");
+    }
+}

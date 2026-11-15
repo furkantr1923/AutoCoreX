@@ -1,0 +1,176 @@
+@page "/teshis"
+@inject ObdServisi Obd
+@inject Veri Veri
+@inject Efekt Efekt
+@implements IDisposable
+
+<SayfaBaslik Ust="OBD-II · SALT OKUNUR" Baslik="Teşhis" />
+
+<section class="panel radar-panel giris-anim">
+    <div class="radar @(taraniyor ? "aktif" : "")">
+        <i class="r-halka"></i><i class="r-halka"></i><i class="r-halka"></i>
+        <i class="r-kol"></i>
+        @if (sonuc != null && !taraniyor)
+        {
+            for (var i = 0; i < sonuc.Count; i++)
+            {
+                <i class="r-hedef" style="--x:@(18 + (i * 37) % 64)%;--y:@(22 + (i * 53) % 56)%"></i>
+            }
+        }
+        <div class="r-merkez">
+            @if (taraniyor)
+            {
+                <b>TARANIYOR</b><small>ECU sorgulanıyor…</small>
+            }
+            else if (sonuc != null)
+            {
+                <b class="@(sonuc.Count == 0 ? "yesil" : "kirmizi")">@sonuc.Count</b><small>arıza kodu</small>
+            }
+            else
+            {
+                <Ikon Ad="teshis" Boyut="34" /><small>Hazır</small>
+            }
+        </div>
+    </div>
+
+    @if (!Obd.Canli)
+    {
+        <div class="not-kutu">
+            <Ikon Ad="bluetooth" Boyut="18" />
+            <span>Arıza kodu okumak için OBD adaptörüne bağlanın ya da demo modunu açın.</span>
+        </div>
+        <div class="eylem-satiri">
+            <button class="btn btn-hayalet" @onclick="DemoAc"><Ikon Ad="oynat" Boyut="16" /> Demo modu</button>
+            <a class="btn btn-ana" href="obd"><Ikon Ad="bluetooth" Boyut="16" /> OBD bağlan</a>
+        </div>
+    }
+    else
+    {
+        <button class="btn btn-ana btn-tam btn-buyuk" @onclick="Tara" disabled="@taraniyor">
+            <Ikon Ad="ara" Boyut="18" /> @(taraniyor ? "Taranıyor…" : "Arıza kodlarını oku")
+        </button>
+        if (Obd.Demo)
+        {
+            <small class="demo-not">DEMO: Sonuçlar örnek kodlardır, gerçek araçtan okunmaz.</small>
+        }
+    }
+    @if (hata != null) { <div class="not-kutu tehlike"><Ikon Ad="uyari" Boyut="18" /><span>@hata</span></div> }
+</section>
+
+@if (sonuc != null)
+{
+    <section class="giris-anim" style="--i:1">
+        <div class="bolum-baslik">
+            <span>SONUÇ</span>
+            @if (mil.HasValue)
+            {
+                <span class="rozet @(mil.Value ? "tehlike" : "iyi")"><i class="nokta"></i>MIL @(mil.Value ? "AÇIK" : "KAPALI")</span>
+            }
+            <span class="rozet @(Obd.Demo ? "demo" : "canli")"><i class="nokta"></i>@(Obd.Demo ? "DEMO" : "GERÇEK")</span>
+        </div>
+        @if (sonuc.Count == 0)
+        {
+            <div class="panel ok-buyuk"><Ikon Ad="kalkan" Boyut="40" Kalinlik="1.4" /><b>Kayıtlı arıza kodu yok</b><small>ECU kalıcı arıza kodu bildirmedi.</small></div>
+        }
+        @for (var i = 0; i < sonuc.Count; i++)
+        {
+            <DtcKart Bilgi="@DtcSozluk.Bul(sonuc[i])" Acik="@(i == 0)" Sira="@i" @key="sonuc[i]" />
+        }
+    </section>
+}
+
+<section class="panel giris-anim" style="--i:2">
+    <div class="panel-baslik"><span>KOD SORGULA</span><small>@DtcSozluk.Sayi kod sözlükte</small></div>
+    <div class="arama-satiri">
+        <input class="girdi mono" placeholder="Örn. P0401" maxlength="5" @bind="sorgu" @bind:event="oninput" autocapitalize="characters" />
+        <button class="btn btn-ana btn-ikon" @onclick="Sorgula" disabled="@(!DtcSozluk.GecerliMi(sorgu))" aria-label="Sorgula"><Ikon Ad="ara" Boyut="18" /></button>
+    </div>
+    @if (sorguSonuc != null)
+    {
+        <DtcKart Bilgi="@sorguSonuc" Acik="true" @key="sorguSonuc.Kod" />
+    }
+</section>
+
+@if (gecmis.Count > 0)
+{
+    <section class="giris-anim" style="--i:3">
+        <div class="bolum-baslik"><span>TARAMA GEÇMİŞİ</span></div>
+        @foreach (var t in gecmis.Take(10))
+        {
+            <div class="liste-satir">
+                <div class="ls-ikon @(t.KodListesi.Count == 0 ? "yesil" : "kirmizi")"><Ikon Ad="teshis" Boyut="18" /></div>
+                <div class="ls-orta">
+                    <b>@(t.KodListesi.Count == 0 ? "Arıza yok" : string.Join(", ", t.KodListesi))</b>
+                    <small>@t.Zaman.ToString("dd.MM.yyyy HH:mm")</small>
+                </div>
+                <span class="rozet @(t.Kaynak == "Demo" ? "demo" : "canli")">@(t.Kaynak == "Demo" ? "DEMO" : "GERÇEK")</span>
+            </div>
+        }
+    </section>
+}
+
+<div class="not-kutu soluk-kutu giris-anim" style="--i:4">
+    <Ikon Ad="kilit" Boyut="18" />
+    <span>Güvenlik gereği bu sürüm yalnızca <b>okuma</b> yapar. Arıza kodu silme, ECU'ya yazma veya kontrol komutu yoktur. Açıklamalar bilgilendirme amaçlıdır, kesin teşhis yerine geçmez.</span>
+</div>
+
+@code {
+    private bool taraniyor;
+    private List<string>? sonuc;
+    private bool? mil;
+    private string? hata;
+    private string sorgu = "";
+    private DtcBilgi? sorguSonuc;
+    private List<TaramaKaydi> gecmis = new();
+    private ObdDurum onceki;
+
+    protected override async Task OnInitializedAsync()
+    {
+        onceki = Obd.Durum;
+        Obd.Degisti += Degisti;
+        await GecmisYukle();
+    }
+
+    private async Task GecmisYukle()
+    {
+        var a = await Veri.AktifAracAsync();
+        gecmis = a == null ? new() : await Veri.TaramalarAsync(a.Id);
+    }
+
+    private void Degisti()
+    {
+        if (Obd.Durum == onceki) return;
+        onceki = Obd.Durum;
+        InvokeAsync(StateHasChanged);
+    }
+
+    private async Task DemoAc() { await Obd.DemoBaslatAsync(); await Efekt.Ses("baslat", 40); }
+
+    private async Task Tara()
+    {
+        taraniyor = true; hata = null; sonuc = null;
+        StateHasChanged();
+        await Efekt.Ses("tarama");
+        var (kodlar, m, h) = await Obd.ArizaOkuAsync();
+        taraniyor = false;
+        if (h != null) { hata = h; await Efekt.Ses("hata", 120); return; }
+        sonuc = kodlar; mil = m;
+        await Efekt.Ses(kodlar.Count == 0 ? "onay" : "uyari", kodlar.Count == 0 ? 30 : 150);
+
+        var a = await Veri.AktifAracAsync();
+        if (a != null)
+        {
+            await Veri.TaramaKaydetAsync(new TaramaKaydi { AracId = a.Id, Kaynak = Obd.Demo ? "Demo" : "Gerçek", Kodlar = string.Join(",", kodlar), MilAcik = m });
+            await GecmisYukle();
+        }
+    }
+
+    private async Task Sorgula()
+    {
+        if (!DtcSozluk.GecerliMi(sorgu)) return;
+        sorguSonuc = DtcSozluk.Bul(sorgu);
+        await Efekt.Ses("onay");
+    }
+
+    public void Dispose() => Obd.Degisti -= Degisti;
+}

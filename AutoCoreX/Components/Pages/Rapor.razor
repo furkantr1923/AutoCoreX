@@ -1,0 +1,113 @@
+@page "/rapor"
+@inject Veri Veri
+@inject ObdServisi Obd
+@inject RaporServisi RaporSrv
+@inject Efekt Efekt
+
+<SayfaBaslik Ust="PDF DIŞA AKTARIM" Baslik="Sağlık raporu" Geri="menu" />
+
+@if (yuklendi && v == null)
+{
+    <AracYok Metin="Rapor aktif aracın kayıtlarından oluşturulur." />
+}
+else if (v != null)
+{
+    <section class="panel rapor-ust giris-anim">
+        <div class="halka-kap buyuk">
+            <svg viewBox="0 0 120 120" class="halka @Sinif">
+                <circle cx="60" cy="60" r="50" class="h-zemin" pathLength="100" />
+                <circle cx="60" cy="60" r="50" class="h-dolu" pathLength="100" style="stroke-dashoffset:@(S.N(100 - (v.Saglik.Skor ?? 0)))" />
+            </svg>
+            <div class="halka-yazi"><b>@(v.Saglik.Skor?.ToString() ?? "—")</b><small>@v.Saglik.Seviye</small></div>
+        </div>
+        <div class="ru-bilgi">
+            <h3>@v.Arac.TamAd</h3>
+            <small>@v.Arac.Ozet</small>
+            <small>@S.Km(v.Arac.Km)</small>
+        </div>
+    </section>
+
+    <section class="panel giris-anim" style="--i:1">
+        <div class="panel-baslik"><span>SKORU ETKİLEYENLER</span></div>
+        @if (v.Saglik.Etkenler.Count == 0)
+        {
+            <small class="soluk">Skor için yeterli veri yok: arıza taraması yap veya bakım kaydı ekle.</small>
+        }
+        @foreach (var e in v.Saglik.Etkenler)
+        {
+            <div class="etken"><span>@e.Metin</span><b class="@(e.Puan < 0 ? "kirmizi" : "yesil")">@(e.Puan == 0 ? "✓" : e.Puan.ToString())</b></div>
+        }
+    </section>
+
+    <section class="panel giris-anim" style="--i:2">
+        <div class="panel-baslik"><span>RAPOR İÇERİĞİ</span></div>
+        <div class="etken"><span>OBD bağlantısı</span><b>@v.ObdDurumu</b></div>
+        <div class="etken"><span>Veri kaynağı</span><b class="@(Obd.Demo ? "sari" : "")">@v.Kaynak</b></div>
+        <div class="etken"><span>Son arıza taraması</span><b>@(v.SonTarama == null ? "Yok" : v.SonTarama.Zaman.ToString("dd.MM.yyyy") + (v.SonTarama.Kaynak == "Demo" ? " (DEMO)" : ""))</b></div>
+        <div class="etken"><span>Bakım kaydı</span><b>@v.Bakimlar.Count</b></div>
+        <div class="etken"><span>Yaklaşan / geciken bakım</span><b>@v.Durumlar.Count(d => d.Durum is BakimDurumu.Gecikti or BakimDurumu.Yaklasiyor)</b></div>
+        <div class="etken"><span>Ortalama tüketim</span><b>@(v.Yakit.OrtTuketim.HasValue ? v.Yakit.OrtTuketim.Value.ToString("0.0") + " L/100" : "—")</b></div>
+    </section>
+
+    <button class="btn btn-ana btn-tam btn-buyuk" @onclick="Olustur" disabled="@calisiyor">
+        <Ikon Ad="paylas" Boyut="18" /> @(calisiyor ? "Hazırlanıyor…" : "PDF oluştur ve paylaş")
+    </button>
+    if (hata != null)
+    {
+        <div class="not-kutu tehlike"><Ikon Ad="uyari" Boyut="18" /><span>@hata</span></div>
+    }
+    <small class="soluk orta-yazi">Şasi numarası rapora eklenmez. DEMO verileri raporda ayrıca işaretlenir.</small>
+}
+
+@code {
+    private RaporVerisi? v;
+    private bool yuklendi, calisiyor;
+    private string? hata;
+
+    private string Sinif => v?.Saglik.Skor switch { null => "gri", >= 85 => "iyi", >= 65 => "orta", _ => "kotu" };
+
+    protected override async Task OnInitializedAsync()
+    {
+        var a = await Veri.AktifAracAsync();
+        if (a != null)
+        {
+            var bakimlar = await Veri.BakimlarAsync(a.Id);
+            var durumlar = Hesap.BakimDurumlari(bakimlar, a);
+            var tarama = (await Veri.TaramalarAsync(a.Id)).FirstOrDefault();
+            v = new RaporVerisi
+            {
+                Arac = a,
+                Bakimlar = bakimlar,
+                Durumlar = durumlar,
+                SonTarama = tarama,
+                Saglik = Hesap.Saglik(durumlar, tarama, Obd),
+                Yakit = Hesap.YakitOzeti(await Veri.YakitlarAsync(a.Id)),
+                ObdDurumu = Obd.Durum switch { ObdDurum.Bagli => $"Bağlı · {Obd.CihazAdi}", ObdDurum.Demo => "Demo modu", _ => "Bağlı değil" },
+                Kaynak = Obd.Durum switch { ObdDurum.Demo => "DEMO (simülasyon)", ObdDurum.Bagli => "Gerçek araç (OBD-II)", _ => "Yok" },
+            };
+            if (Obd.Canli)
+                foreach (var p in Pidler.Hepsi)
+                {
+                    var d = p.Kod == "42" ? Obd.Voltaj() : Obd.Deger(p.Kod);
+                    if (d.HasValue) v.Sensorler.Add((p.Ad + (Obd.Demo ? " (demo)" : ""), d.Value.ToString("N" + p.Ondalik) + " " + p.Birim));
+                }
+        }
+        yuklendi = true;
+    }
+
+    private async Task Olustur()
+    {
+        if (v == null) return;
+        calisiyor = true; hata = null;
+        StateHasChanged();
+        try
+        {
+            var yol = await RaporSrv.PdfOlusturAsync(v);
+            if (yol == null) { hata = "PDF oluşturulamadı."; return; }
+            await Efekt.Ses("onay", 40);
+            await RaporSrv.PaylasAsync(yol);
+        }
+        catch (Exception ex) { hata = "PDF hatası: " + ex.Message; await Efekt.Ses("hata", 100); }
+        finally { calisiyor = false; }
+    }
+}

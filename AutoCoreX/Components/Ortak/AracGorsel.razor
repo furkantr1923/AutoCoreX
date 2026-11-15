@@ -1,0 +1,29 @@
+@inject Cihaz Cihaz
+
+@if (veri != null)
+{
+    <img class="arac-foto" src="@veri" alt="" />
+}
+else
+{
+    <svg class="arac-siluet" viewBox="0 0 240 110">
+        <path d="M18 78 L30 58 Q38 46 58 44 L92 40 Q108 22 136 22 L160 22 Q182 24 196 42 L214 48 Q226 52 226 66 L226 78 Z" />
+        <path d="M100 42 Q112 30 134 30 L156 30 Q172 32 182 44 Z" class="cam" />
+        <circle cx="66" cy="80" r="15" class="teker" /><circle cx="186" cy="80" r="15" class="teker" />
+        <circle cx="66" cy="80" r="6" class="jant" /><circle cx="186" cy="80" r="6" class="jant" />
+        <path d="M20 92 H222" class="zemin" />
+    </svg>
+}
+
+@code {
+    [Parameter] public string? Yol { get; set; }
+    private string? veri;
+    private string? sonYol;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (Yol == sonYol) return;
+        sonYol = Yol;
+        veri = await Cihaz.GorselAsync(Yol);
+    }
+}

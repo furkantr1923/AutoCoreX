@@ -1,0 +1,56 @@
+@page "/yolculuk/{Id:int}"
+@inject Veri Veri
+@inject Efekt Efekt
+@inject NavigationManager Nav
+
+<SayfaBaslik Ust="YOLCULUK" Baslik="@(y?.Baslangic.ToString("dd MMM, HH:mm") ?? "Yolculuk")" Geri="yolculuk" />
+
+@if (y != null)
+{
+    <section class="panel rota-panel giris-anim">
+        <RotaCizim Rota="@rota" />
+        <small class="soluk orta-yazi">Çevrimdışı rota çizimi · <span class="yesil">●</span> başlangıç <span class="vurgu-yazi">●</span> bitiş</small>
+    </section>
+
+    <section class="izgara-2 giris-anim" style="--i:1">
+        <div class="ozet-kart buyuk vurgu"><small>MESAFE</small><b>@y.MesafeKm.ToString("0.00")</b><span>km</span></div>
+        <div class="ozet-kart buyuk"><small>SÜRE</small><b>@S.Sure(y.Sure)</b><span></span></div>
+    </section>
+    <section class="izgara-2 giris-anim" style="--i:2">
+        <div class="ozet-kart"><small>ORTALAMA HIZ</small><b>@y.OrtHiz.ToString("0")</b><span>km/s</span></div>
+        <div class="ozet-kart"><small>MAKS. HIZ</small><b>@y.MaksHiz.ToString("0")</b><span>km/s</span></div>
+    </section>
+
+    <div class="eylem-satiri giris-anim" style="--i:3">
+        @if (rota.Count > 0)
+        {
+            <button class="btn btn-hayalet" @onclick="HaritadaAc"><Ikon Ad="harita" Boyut="16" /> Varışı haritada aç</button>
+        }
+        <button class="btn btn-tehlike-hayalet" @onclick="Sil"><Ikon Ad="sil" Boyut="16" /> Sil</button>
+    </div>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+    private Yolculuk? y;
+    private List<double[]> rota = new();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        y = await Veri.YolculukAsync(Id);
+        rota = y == null ? new() : GpsServisi.Rota(y);
+    }
+
+    private async Task HaritadaAc()
+    {
+        var son = rota[^1];
+        try { await Map.Default.OpenAsync(son[0], son[1], new MapLaunchOptions { Name = "Yolculuk varışı" }); } catch { }
+    }
+
+    private async Task Sil()
+    {
+        await Veri.YolculukSilAsync(Id);
+        await Efekt.Ses("sil", 60);
+        Nav.NavigateTo("yolculuk");
+    }
+}

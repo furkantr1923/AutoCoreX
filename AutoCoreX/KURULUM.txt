@@ -1,0 +1,11 @@
+AUTOCORE X - KURULUM (Visual Studio 2026)
+
+1) Visual Studio > Yeni proje oluştur > ".NET MAUI Blazor Hybrid Uygulaması"
+   Proje adı: AutoCoreX   (tam olarak böyle yaz)
+2) Projeyi kapat. Bu zip'in içindekileri proje klasörüne (AutoCoreX.csproj'un olduğu yer) kopyala,
+   "Hedefteki dosyaları değiştir" de.
+3) Visual Studio'da projeyi tekrar aç > üstte cihaz olarak telefonunu veya "Android" seç > Derle.
+4) APK: Çözüm Gezgini'nde projeye sağ tık > "Terminalde Aç" ve şunu yaz:
+   dotnet publish -f net10.0-android -c Release -p:AndroidPackageFormat=apk
+5) APK'yı bulmak için aynı terminale:
+   explorer (Get-ChildItem -Recurse -Filter *Signed.apk | Select-Object -First 1).DirectoryName

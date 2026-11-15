@@ -1,0 +1,134 @@
+@inherits LayoutComponentBase
+@inject NavigationManager Nav
+@inject Efekt Efekt
+@inject Ayarlar Ayar
+@inject Veri Veri
+@implements IDisposable
+
+@if (asama < 3)
+{
+    <div class="kontak @(asama == 1 ? "test" : "") @(asama == 2 ? "kapan" : "")">
+        <div class="k-izgara"></div>
+        <div class="k-tarama"></div>
+        <div class="k-marka"><span>AUTOCORE</span><b>X</b></div>
+        <small class="k-slogan">TEŞHİS · KOKPİT · TELEMETRİ</small>
+
+        <div class="k-merkez">
+            <div class="k-halka h1"></div>
+            <div class="k-halka h2"></div>
+            <div class="k-halka h3"></div>
+            <button class="k-buton sessiz" @onclick="KontakAc" disabled="@(asama > 0)">
+                <span class="k-ust">ENGINE</span>
+                <span class="k-ana">START</span>
+                <span class="k-alt">STOP</span>
+            </button>
+        </div>
+
+        <div class="k-led">
+            @for (var i = 0; i < 14; i++)
+            {
+                <i style="--i:@i"></i>
+            }
+        </div>
+
+        <ul class="k-kontrol">
+            @for (var i = 0; i < Kontroller.Length; i++)
+            {
+                <li style="--i:@i"><span>@Kontroller[i]</span><b>OK</b></li>
+            }
+        </ul>
+        <small class="k-ipucu">@(asama == 0 ? "Başlatmak için butona dokun" : "Sistem kontrolü…")</small>
+    </div>
+}
+
+<div class="uygulama @(asama >= 2 ? "acik" : "")">
+    <div class="zemin-izgara"></div>
+    <div class="zemin-isik"></div>
+
+    <header class="ust">
+        <a href="" class="logo">
+            <svg viewBox="0 0 40 40" width="30" height="30"><path d="M8 28 A 14 14 0 1 1 32 28" fill="none" stroke="#123040" stroke-width="4" stroke-linecap="round" /><path d="M8 28 A 14 14 0 0 1 26 9" fill="none" stroke="#00E5FF" stroke-width="4" stroke-linecap="round" /><path d="M20 22 L 27 14" stroke="#FF3B5C" stroke-width="2.5" stroke-linecap="round" /><circle cx="20" cy="22" r="2.6" fill="#E6F1F5" /></svg>
+            <span>AUTOCORE</span><b>X</b>
+        </a>
+        <KaynakRozeti />
+    </header>
+
+    <main class="sahne" @key="anahtar">@Body</main>
+
+    <nav class="alt-menu">
+        <NavLink href="" Match="NavLinkMatch.All"><Ikon Ad="kokpit" /><span>Kokpit</span></NavLink>
+        <NavLink href="teshis"><Ikon Ad="teshis" /><span>Teşhis</span></NavLink>
+        <NavLink href="garaj" class="orta"><span class="orta-hex"><Ikon Ad="arac" Boyut="26" /></span><span>Garaj</span></NavLink>
+        <NavLink href="bakim"><Ikon Ad="bakim" /><span>Servis</span></NavLink>
+        <NavLink href="menu"><Ikon Ad="menu" /><span>Menü</span></NavLink>
+    </nav>
+</div>
+
+@code {
+    private int asama;   // 0 bekliyor, 1 sistem testi, 2 kapanıyor, 3 bitti
+    private string anahtar = "";
+    private static readonly string[] Kontroller = { "ECU ARAYÜZÜ", "VERİTABANI", "SENSÖR MODÜLÜ", "GPS MODÜLÜ", "SES SİSTEMİ" };
+
+    protected override async Task OnInitializedAsync()
+    {
+        anahtar = Yol(Nav.Uri);
+        Nav.LocationChanged += Degisti;
+        if (!Ayar.AcilisAnimasyonu) asama = 3;
+        await Veri.HazirlaAsync();
+        if (asama == 3) _ = Hatirlat();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool ilk)
+    {
+        if (ilk) await Efekt.Esitle();
+    }
+
+    private async Task KontakAc()
+    {
+        if (asama > 0) return;
+        asama = 1;
+        StateHasChanged();
+        await Efekt.Ses("kontak", 80);
+        await Task.Delay(2200);
+        Efekt.Titret(40);
+        asama = 2;
+        StateHasChanged();
+        await Task.Delay(600);
+        asama = 3;
+        StateHasChanged();
+        _ = Hatirlat();
+    }
+
+    // Bakım hatırlatması: ilk açılışta bildirim izni sorulur, sonra günde bir kez bildirim
+    private async Task Hatirlat()
+    {
+        try
+        {
+            if (!Preferences.Default.Get("bildirimSoruldu", false))
+            {
+                Preferences.Default.Set("bildirimSoruldu", true);
+                await MainThread.InvokeOnMainThreadAsync(async () => await Permissions.RequestAsync<BildirimIzni>());
+            }
+            var arac = await Veri.AktifAracAsync();
+            if (arac == null) return;
+            var durumlar = Hesap.BakimDurumlari(await Veri.BakimlarAsync(arac.Id), arac);
+            await Bildirim.BakimHatirlat(durumlar, arac.TamAd);
+        }
+        catch { }
+    }
+
+    private static string Yol(string uri)
+    {
+        var y = new Uri(uri).AbsolutePath;
+        return y;
+    }
+
+    private void Degisti(object? s, LocationChangedEventArgs e)
+    {
+        anahtar = Yol(e.Location);
+        _ = Efekt.Ses("gecis");
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose() => Nav.LocationChanged -= Degisti;
+}

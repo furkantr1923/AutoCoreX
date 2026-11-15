@@ -1,0 +1,18 @@
+<div class="sayfa-baslik">
+    @if (Geri != null)
+    {
+        <a class="geri-btn" href="@Geri" aria-label="Geri"><Ikon Ad="geri" Boyut="20" /></a>
+    }
+    <div class="sb-yazi">
+        @if (Ust != null) { <small class="sb-ust">@Ust</small> }
+        <h1 class="glitch" data-metin="@Baslik">@Baslik</h1>
+    </div>
+    @if (ChildContent != null) { <div class="sb-eylem">@ChildContent</div> }
+</div>
+
+@code {
+    [Parameter] public string Baslik { get; set; } = "";
+    [Parameter] public string? Ust { get; set; }
+    [Parameter] public string? Geri { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

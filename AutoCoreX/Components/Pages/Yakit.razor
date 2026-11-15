@@ -1,0 +1,101 @@
+@page "/yakit"
+@inject Veri Veri
+
+<SayfaBaslik Ust="@(arac?.TamAd.ToUpperInvariant() ?? "SERVİS")" Baslik="Yakıt">
+    @if (arac != null)
+    {
+        <a class="btn btn-ana btn-ikon" href="yakit/yeni" aria-label="Yakıt ekle"><Ikon Ad="arti" Boyut="20" /></a>
+    }
+</SayfaBaslik>
+<ServisSekme />
+
+@if (yuklendi && arac == null)
+{
+    <AracYok Metin="Yakıt kayıtları ve tüketim hesapları aktif araca göre tutulur." />
+}
+else if (arac != null)
+{
+    <section class="izgara-2 giris-anim">
+        <div class="ozet-kart buyuk vurgu">
+            <small>ORTALAMA TÜKETİM</small>
+            <b>@(o.OrtTuketim?.ToString("0.0") ?? "—")</b><span>L / 100 km</span>
+        </div>
+        <div class="ozet-kart buyuk">
+            <small>100 KM MALİYETİ</small>
+            <b>@(o.Maliyet100?.ToString("N0") ?? "—")</b><span>₺</span>
+        </div>
+    </section>
+    <section class="izgara-3 giris-anim" style="--i:1">
+        <div class="ozet-kart"><small>BU AY</small><b>@o.BuAy.ToString("N0")</b><span>₺</span></div>
+        <div class="ozet-kart"><small>BU YIL</small><b>@o.BuYil.ToString("N0")</b><span>₺</span></div>
+        <div class="ozet-kart"><small>TOPLAM</small><b>@o.ToplamLitre.ToString("N0")</b><span>litre</span></div>
+    </section>
+    if (o.Not != null)
+    {
+        <div class="not-kutu"><Ikon Ad="bilgi" Boyut="18" /><span>@o.Not</span></div>
+    }
+    else
+    {
+        <small class="soluk orta-yazi">Depo-full yöntemiyle @S.Km(o.HesaplananKm) üzerinden hesaplandı.</small>
+    }
+
+    <section class="panel giris-anim" style="--i:2">
+        <div class="panel-baslik"><span>AYLIK YAKIT GİDERİ</span><small>son 6 ay</small></div>
+        <div class="cubuk-grafik">
+            @for (var i = 0; i < o.Aylik.Count; i++)
+            {
+                var ay = o.Aylik[i];
+                var oran = enYuksek > 0 ? ay.Tutar / enYuksek : 0;
+                <div class="cg-sutun" style="--i:@i">
+                    <span class="cg-deger">@(ay.Tutar > 0 ? ay.Tutar.ToString("N0") : "")</span>
+                    <div class="cg-cubuk"><i style="height:@(S.N(Math.Max(oran * 100, ay.Tutar > 0 ? 4 : 0)))%"></i></div>
+                    <small>@ay.Etiket</small>
+                </div>
+            }
+        </div>
+    </section>
+
+    <section class="giris-anim" style="--i:3">
+        <div class="bolum-baslik"><span>KAYITLAR</span><small>@kayitlar.Count dolum</small></div>
+        @if (kayitlar.Count == 0)
+        {
+            <div class="bos">
+                <Ikon Ad="yakit" Boyut="36" Kalinlik="1.3" />
+                <b>Yakıt kaydı yok</b>
+                <small>Her dolumda km ve litreyi gir; tüketim otomatik hesaplanır.</small>
+                <a class="btn btn-ana" href="yakit/yeni"><Ikon Ad="arti" Boyut="16" /> Dolum ekle</a>
+            </div>
+        }
+        @foreach (var y in kayitlar)
+        {
+            <a class="liste-satir dokun" href="yakit/@y.Id">
+                <div class="ls-ikon"><Ikon Ad="yakit" Boyut="18" /></div>
+                <div class="ls-orta">
+                    <b>@y.Litre.ToString("0.##") L · @S.Para(y.Toplam)</b>
+                    <small>@y.Tarih.ToString("dd MMM yyyy") · @S.Km(y.Km)@(string.IsNullOrWhiteSpace(y.Istasyon) ? "" : " · " + y.Istasyon)</small>
+                </div>
+                @if (y.DepoDolu) { <span class="rozet iyi">FULL</span> }
+            </a>
+        }
+    </section>
+}
+
+@code {
+    private Arac? arac;
+    private bool yuklendi;
+    private List<YakitKaydi> kayitlar = new();
+    private YakitOzeti o = new();
+    private double enYuksek;
+
+    protected override async Task OnInitializedAsync()
+    {
+        arac = await Veri.AktifAracAsync();
+        if (arac != null)
+        {
+            kayitlar = await Veri.YakitlarAsync(arac.Id);
+            o = Hesap.YakitOzeti(kayitlar);
+            enYuksek = o.Aylik.Count == 0 ? 0 : o.Aylik.Max(a => a.Tutar);
+        }
+        yuklendi = true;
+    }
+}

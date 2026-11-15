@@ -1,0 +1,43 @@
+@page "/menu"
+@inject ObdServisi ObdSrv
+@inject GpsServisi Gps
+
+<SayfaBaslik Ust="AUTOCORE X" Baslik="Menü" />
+
+<div class="menu-izgara">
+    @for (var i = 0; i < Ogeler.Length; i++)
+    {
+        var o = Ogeler[i];
+        <a class="menu-oge dokun giris-anim" href="@o.Yol" style="--i:@i">
+            <span class="mo-ikon"><Ikon Ad="@o.Ikon" Boyut="28" Kalinlik="1.5" /></span>
+            <b>@o.Ad</b>
+            <small>@Alt(o)</small>
+            <i class="mo-kose"></i>
+        </a>
+    }
+</div>
+
+<div class="surum giris-anim" style="--i:8">AUTOCORE X · v1.0 · Çevrimdışı · Hesap gerektirmez</div>
+
+@code {
+    private record Oge(string Ad, string Ikon, string Yol, string Aciklama);
+
+    private static readonly Oge[] Ogeler =
+    {
+        new("OBD bağlantısı", "bluetooth", "obd", "ELM327 adaptör"),
+        new("Teşhis", "teshis", "teshis", "Arıza kodları"),
+        new("Yakıt", "yakit", "yakit", "Tüketim ve maliyet"),
+        new("Yolculuk", "rota", "yolculuk", "GPS kaydı"),
+        new("Bakım", "bakim", "bakim", "Servis geçmişi"),
+        new("Sağlık raporu", "rapor", "rapor", "PDF oluştur"),
+        new("Garaj", "arac", "garaj", "Araç profilleri"),
+        new("Ayarlar", "ayar", "ayarlar", "Ses, titreşim, veri"),
+    };
+
+    private string Alt(Oge o) => o.Yol switch
+    {
+        "obd" => ObdSrv.Durum switch { ObdDurum.Bagli => "● Bağlı", ObdDurum.Demo => "● Demo açık", _ => o.Aciklama },
+        "yolculuk" => Gps.Aktif ? "● Kayıtta" : o.Aciklama,
+        _ => o.Aciklama
+    };
+}
